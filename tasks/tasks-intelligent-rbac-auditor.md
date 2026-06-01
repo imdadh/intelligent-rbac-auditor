@@ -7,165 +7,160 @@
 
 - `README.md` — Project overview, architecture diagram, setup instructions, API reference link, and sample usage.
 - `pyproject.toml` — Python project metadata, dependencies, and tool configuration (pytest, coverage, linting).
-- `Dockerfile` — Multi-stage Docker build for the FastAPI application.
-- `docker-compose.yml` — Compose file bringing up FastAPI service, PostgreSQL, migrations, and seed data.
+- `Dockerfile` — Multi-stage Docker build for the FastAPI service.
+- `docker-compose.yml` — Orchestrates FastAPI service and PostgreSQL; runs migrations and seeds data on startup.
 - `.env.example` — Template for all required and optional environment variables.
 - `app/__init__.py` — App package init.
-- `app/main.py` — FastAPI application factory, middleware registration, static mount, and root route.
+- `app/main.py` — FastAPI application factory, middleware registration, static file mounting, and root route.
 - `app/core/__init__.py` — Core package init.
-- `app/core/config.py` — Pydantic Settings class reading environment variables with defaults.
+- `app/core/config.py` — Pydantic Settings class loading all environment variables with defaults.
 - `app/core/logging.py` — Structured JSON logging setup with configurable log level and correlation ID injection.
-- `app/core/rate_limit.py` — SlowAPI rate-limiting configuration and middleware attachment.
-- `app/core/auth.py` — Optional API key authentication dependency.
 - `app/core/middleware.py` — Correlation ID middleware that generates/propagates request IDs.
-- `app/models/__init__.py` — Models package init, re-exports all SQLAlchemy models.
-- `app/models/base.py` — SQLAlchemy declarative base and async engine/session factory.
+- `app/core/rate_limit.py` — SlowAPI rate-limiting configuration and error handler.
+- `app/core/auth.py` — Optional API key authentication dependency, toggled by AUTH_ENABLED.
+- `app/models/__init__.py` — Models package init; re-exports all SQLAlchemy models.
+- `app/models/database.py` — SQLAlchemy engine, session factory, and Base declarative class.
 - `app/models/dataset.py` — SQLAlchemy model for the `datasets` table.
 - `app/models/audit.py` — SQLAlchemy model for the `audits` table.
 - `app/models/finding.py` — SQLAlchemy model for the `findings` table.
 - `app/models/query_log.py` — SQLAlchemy model for the `query_logs` table.
 - `app/schemas/__init__.py` — Schemas package init.
 - `app/schemas/dataset.py` — Pydantic schemas for dataset ingestion request/response and JSON validation.
-- `app/schemas/audit.py` — Pydantic schemas for audit creation, status polling, and report responses.
-- `app/schemas/finding.py` — Pydantic schema for individual finding records.
-- `app/schemas/query.py` — Pydantic schemas for natural-language query request/response.
-- `app/schemas/common.py` — Shared envelope schemas (`DataResponse`, `ErrorResponse`, `Meta`).
+- `app/schemas/audit.py` — Pydantic schemas for audit request, status response, and full audit result.
+- `app/schemas/finding.py` — Pydantic schema for individual findings (category, severity, evidence, narrative).
+- `app/schemas/query.py` — Pydantic schemas for natural-language query request and response.
+- `app/schemas/common.py` — Shared response envelope schemas (success wrapper, error wrapper).
 - `app/api/__init__.py` — API package init.
 - `app/api/router.py` — Top-level APIRouter aggregating all sub-routers under `/api/v1`.
-- `app/api/datasets.py` — Route handler for `POST /api/v1/datasets` and `GET /api/v1/datasets/{dataset_id}`.
-- `app/api/audits.py` — Route handlers for `POST /api/v1/audits`, `GET /api/v1/audits/{audit_id}`, and report retrieval.
-- `app/api/query.py` — Route handler for `POST /api/v1/query`.
+- `app/api/datasets.py` — Route handler for `POST /api/v1/datasets` (dataset ingestion).
+- `app/api/audits.py` — Route handlers for `POST /api/v1/audits` and `GET /api/v1/audits/{audit_id}`.
+- `app/api/query.py` — Route handler for `POST /api/v1/query` (natural-language query).
 - `app/api/health.py` — Route handler for `GET /health`.
 - `app/services/__init__.py` — Services package init.
-- `app/services/dataset_service.py` — Business logic for dataset validation, persistence, and retrieval.
-- `app/services/audit_service.py` — Orchestrates the full audit pipeline: pre-processing, LLM analysis, finding persistence.
-- `app/services/preprocessing.py` — Computes derived features: days since last sign-in, role tier, assignment lineage, role counts.
-- `app/services/report_service.py` — Generates structured JSON report and Markdown narrative report from findings.
-- `app/services/query_service.py` — Interprets natural-language questions against a dataset and returns structured + narrative answers.
+- `app/services/ingestion.py` — Business logic for validating and persisting uploaded datasets.
+- `app/services/pipeline.py` — Audit pipeline orchestrator: pre-processing, LLM analysis, finding persistence.
+- `app/services/preprocessing.py` — Derived feature computation (days since sign-in, role tier, assignment lineage, role count).
+- `app/services/report.py` — Report generation: structured JSON report and Markdown narrative report.
+- `app/services/query_engine.py` — Natural-language query processing: prompt construction, LLM call, response formatting.
 - `app/llm/__init__.py` — LLM package init.
 - `app/llm/base.py` — Abstract base class `BaseLLMProvider` defining the provider interface.
-- `app/llm/openai_provider.py` — Concrete `OpenAIProvider` implementation using LangChain + OpenAI.
-- `app/llm/azure_openai_provider.py` — Concrete `AzureOpenAIProvider` implementation using LangChain + Azure OpenAI.
+- `app/llm/openai_provider.py` — Concrete `OpenAIProvider` implementation with retry logic.
+- `app/llm/azure_openai_provider.py` — Concrete `AzureOpenAIProvider` implementation with retry logic.
 - `app/llm/factory.py` — Factory function that returns the correct provider based on `LLM_PROVIDER` env var.
-- `app/llm/prompts/overprivileged_analysis.py` — LangChain prompt template for overprivileged account classification.
+- `app/llm/prompts/overprivileged_analysis.py` — LangChain prompt template for overprivileged account detection.
 - `app/llm/prompts/dormant_analysis.py` — LangChain prompt template for dormant privileged role detection.
 - `app/llm/prompts/narrative_report.py` — LangChain prompt template for generating the Markdown narrative report.
-- `app/llm/prompts/query_answering.py` — LangChain prompt template for natural-language query interpretation.
-- `app/llm/output_parsers.py` — Pydantic-based LangChain output parsers for structured LLM responses.
-- `app/llm/retry.py` — Retry logic with exponential backoff for all LLM API calls.
-- `app/static/index.html` — Single-page web UI HTML shell.
-- `app/static/styles.css` — Dark-themed CSS for the chat/audit interface.
-- `app/static/app.js` — Vanilla JavaScript (or Alpine.js) driving UI interactions and API calls.
-- `scripts/generate_synthetic_data.py` — CLI script to generate deterministic synthetic Azure AD dataset JSON.
-- `scripts/seed_db.py` — Script to insert the synthetic dataset into the database on first startup.
-- `migrations/env.py` — Alembic environment configuration pointing at SQLAlchemy models.
+- `app/llm/prompts/query_answer.py` — LangChain prompt template for natural-language query answering.
+- `app/static/index.html` — Single-page web UI HTML.
+- `app/static/style.css` — Web UI stylesheet (dark theme, severity badges, layout).
+- `app/static/app.js` — Web UI JavaScript: API calls, DOM updates, chat interaction flow.
+- `scripts/generate_synthetic_data.py` — CLI script to generate the deterministic 100-user synthetic dataset JSON.
+- `scripts/seed_database.py` — Script to load the synthetic dataset JSON into the database via the ingestion service.
+- `migrations/env.py` — Alembic environment configuration.
 - `migrations/versions/001_initial_schema.py` — Initial Alembic migration creating all tables.
 - `alembic.ini` — Alembic configuration file.
 - `tests/__init__.py` — Tests package init.
-- `tests/conftest.py` — Shared Pytest fixtures: test database, test client, mock LLM provider, sample data loaders.
+- `tests/conftest.py` — Shared pytest fixtures: test database, test client, mock LLM provider, sample data.
 - `tests/unit/__init__.py` — Unit tests package init.
 - `tests/unit/test_config.py` — Tests for `app/core/config.py`.
-- `tests/unit/test_preprocessing.py` — Tests for `app/services/preprocessing.py`.
-- `tests/unit/test_schema_validation.py` — Tests for Pydantic schema validation logic in `app/schemas/dataset.py`.
-- `tests/unit/test_llm_provider_interface.py` — Tests for provider factory, base class contract, and retry logic.
-- `tests/unit/test_output_parsers.py` — Tests for LangChain output parsers in `app/llm/output_parsers.py`.
-- `tests/unit/test_report_service.py` — Tests for report generation logic in `app/services/report_service.py`.
+- `tests/unit/test_schemas.py` — Tests for Pydantic schema validation (dataset, audit, finding, query).
+- `tests/unit/test_preprocessing.py` — Tests for `app/services/preprocessing.py` derived feature computation.
+- `tests/unit/test_ingestion.py` — Tests for `app/services/ingestion.py` validation and persistence logic.
+- `tests/unit/test_report.py` — Tests for `app/services/report.py` structured and narrative report generation.
+- `tests/unit/test_llm_factory.py` — Tests for `app/llm/factory.py` provider selection logic.
+- `tests/unit/test_llm_providers.py` — Tests for LLM provider classes with mocked API calls.
+- `tests/unit/test_query_engine.py` — Tests for `app/services/query_engine.py` with mocked LLM.
 - `tests/unit/test_auth.py` — Tests for optional API key auth dependency.
 - `tests/unit/test_rate_limit.py` — Tests for rate-limiting behavior.
 - `tests/integration/__init__.py` — Integration tests package init.
-- `tests/integration/test_dataset_ingestion.py` — End-to-end test: upload dataset via API, verify persistence.
-- `tests/integration/test_audit_pipeline.py` — End-to-end test: ingest data, trigger audit, poll status, verify findings.
-- `tests/integration/test_report_output.py` — End-to-end test: verify JSON and Markdown report content after audit.
-- `tests/integration/test_query_endpoint.py` — End-to-end test: ask natural-language questions, verify structured answers.
-- `tests/integration/test_health.py` — Test for the `/health` endpoint verifying DB connectivity.
+- `tests/integration/test_dataset_api.py` — Integration tests for dataset ingestion endpoint.
+- `tests/integration/test_audit_pipeline.py` — Integration tests for full audit pipeline end-to-end.
+- `tests/integration/test_query_api.py` — Integration tests for natural-language query endpoint.
+- `tests/integration/test_health.py` — Integration tests for health check endpoint.
 
 ## Tasks
 
 - [ ] 0.0 Initialize greenfield repo, project structure, and feature branch
-  - [x] 0.1 Create and checkout a new branch for this feature (e.g., `git checkout -b feature/intelligent-rbac-auditor`)
-  - [x] 0.2 Create the top-level directory structure: `app/`, `app/api/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/llm/`, `app/llm/prompts/`, `app/static/`, `scripts/`, `migrations/`, `migrations/versions/`, `tests/`, `tests/unit/`, `tests/integration/`, `tasks/`
-  - [x] 0.3 Add `__init__.py` files to all Python packages (`app/`, `app/api/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/llm/`, `tests/`, `tests/unit/`, `tests/integration/`)
-  - [x] 0.4 Create `pyproject.toml` with project metadata, Python 3.11+ requirement, and all dependencies listed in the PRD (FastAPI, Uvicorn, SQLAlchemy 2.0, Alembic, LangChain, langchain-openai, Pydantic v2, structlog, slowapi, httpx, psycopg2-binary/asyncpg, Faker, pytest, pytest-asyncio, pytest-cov)
-  - [x] 0.5 Create `.env.example` listing every environment variable from the PRD table with placeholder values and comments
-  - [x] 0.6 Create a minimal `README.md` with project title, one-paragraph overview, and a "Setup" section placeholder
-  - [x] 0.7 Make an initial commit with the empty project scaffold
+  - [ ] 0.1 Create and checkout a new branch for this feature (e.g., `git checkout -b feature/intelligent-rbac-auditor`)
+  - [ ] 0.2 Create the top-level directory structure: `app/`, `app/api/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/llm/`, `app/llm/prompts/`, `app/static/`, `scripts/`, `migrations/`, `migrations/versions/`, `tests/`, `tests/unit/`, `tests/integration/`, `tasks/`
+  - [ ] 0.3 Add `__init__.py` files to all Python packages (`app/`, `app/api/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/llm/`, `tests/`, `tests/unit/`, `tests/integration/`)
+  - [ ] 0.4 Create `pyproject.toml` with project metadata, all dependencies listed in the PRD (FastAPI, uvicorn, SQLAlchemy, alembic, langchain, langchain-openai, pydantic, pydantic-settings, structlog, slowapi, httpx, psycopg2-binary or asyncpg, faker, pytest, pytest-asyncio, pytest-cov), and tool configuration sections for pytest and coverage
+  - [ ] 0.5 Create `.env.example` with all environment variables from the PRD table (DATABASE_URL, LLM_PROVIDER, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, AUTH_ENABLED, API_KEY, RATE_LIMIT_PER_MINUTE, LOG_LEVEL, DORMANT_THRESHOLD_DAYS) with placeholder/default values
+  - [ ] 0.6 Create a `.gitignore` for Python projects (venv, __pycache__, .env, *.pyc, .pytest_cache, .coverage, etc.)
+  - [ ] 0.7 Create a skeleton `README.md` with project title, one-paragraph overview, and placeholder sections for Architecture, Setup, API Reference, and Usage
 - [ ] 1.0 Set up configuration, structured logging, and Docker/Compose infrastructure
-  - [ ] 1.1 Implement `app/core/config.py` using Pydantic `BaseSettings` to read all environment variables from the PRD table (`DATABASE_URL`, `LLM_PROVIDER`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AUTH_ENABLED`, `API_KEY`, `RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL`, `DORMANT_THRESHOLD_DAYS`) with their documented defaults
-  - [ ] 1.2 Implement `app/core/logging.py` to configure `structlog` for JSON-formatted structured logging, reading `LOG_LEVEL` from config, and providing a `get_logger` function that includes correlation ID context
-  - [ ] 1.3 Implement `app/core/middleware.py` with a correlation ID middleware that generates a UUID for each request (or reads `X-Request-ID` header), stores it in context, and adds it to the response headers
-  - [ ] 1.4 Create `app/main.py` with the FastAPI application factory: register the correlation ID middleware, mount the API router (placeholder), configure structured logging on startup, and set the app title/version for OpenAPI docs
-  - [ ] 1.5 Write the `Dockerfile` as a multi-stage build: install dependencies from `pyproject.toml`, copy application code, expose port 8000, and run Uvicorn
-  - [ ] 1.6 Write `docker-compose.yml` with two services: `db` (PostgreSQL 15, volume-mounted, with health check) and `web` (the app, depends on `db`, env vars from `.env`, port mapping 8000:8000, startup command that runs Alembic migrations then seeds data then starts Uvicorn)
-  - [ ] 1.7 Verify the app starts locally with `uvicorn app.main:app --reload` and returns a response on `/docs`
+  - [x] 1.1 Implement `app/core/config.py` using Pydantic `BaseSettings` to load all environment variables from the PRD table, with proper types, defaults, and validation (e.g., `LLM_PROVIDER` must be one of `openai` or `azure_openai`)
+  - [ ] 1.2 Implement `app/core/logging.py` to configure `structlog` for structured JSON logging; log level must be read from `config.LOG_LEVEL`; ensure logger outputs JSON to stdout with timestamp, level, logger name, and a correlation_id field
+  - [ ] 1.3 Implement `app/core/middleware.py` with a correlation ID middleware that generates a UUID for each incoming request (or reads one from an `X-Correlation-ID` header), stores it in context, and adds it to the response headers
+  - [ ] 1.4 Create `app/main.py` with the FastAPI application factory: instantiate the app, add the correlation ID middleware, configure exception handlers, and mount a placeholder root route returning `{"status": "ok"}`
+  - [ ] 1.5 Create `Dockerfile` using a multi-stage build: install dependencies in a builder stage, copy the app into a slim runtime image, expose port 8000, and set the entrypoint to `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+  - [ ] 1.6 Create `docker-compose.yml` defining two services: `db` (PostgreSQL 15 with a named volume for data persistence, health check, and environment variables for POSTGRES_USER/PASSWORD/DB) and `web` (built from the Dockerfile, depends_on db healthy, maps port 8000, passes all env vars from `.env`, and runs an entrypoint script that executes Alembic migrations then starts uvicorn)
+  - [ ] 1.7 Create a `docker-entrypoint.sh` script that runs `alembic upgrade head`, then `python scripts/seed_database.py` (conditionally, only if the dataset table is empty), then starts uvicorn
+  - [ ] 1.8 Verify the Docker setup builds and starts without errors by running `docker-compose build` (the app won't fully work yet, but the container should start and the health placeholder should respond)
 - [ ] 2.0 Define database models, Pydantic schemas, and Alembic migrations
-  - [ ] 2.1 Implement `app/models/base.py` with the SQLAlchemy declarative base, engine creation from `DATABASE_URL`, and session factory (sync is fine for Phase 1; use `create_engine` and `sessionmaker`)
-  - [ ] 2.2 Implement `app/models/dataset.py` with the `Dataset` model: columns for `id` (UUID primary key), `name` (string), `raw_data` (JSON/JSONB), `user_count` (integer), `created_at` (timestamp with timezone)
-  - [ ] 2.3 Implement `app/models/audit.py` with the `Audit` model: columns for `id` (UUID), `dataset_id` (FK to datasets), `status` (string enum: pending/running/completed/failed), `parameters` (JSON), `summary` (JSON, nullable), `started_at`, `completed_at`, `created_at`
-  - [ ] 2.4 Implement `app/models/finding.py` with the `Finding` model: columns for `id` (UUID), `audit_id` (FK to audits), `category` (string: overprivileged/dormant_privileged), `severity` (string: critical/high/medium/low), `principal_id` (string), `principal_name` (string), `role_assignments` (JSON), `evidence` (JSON), `remediation` (text), `narrative` (text), `created_at`
-  - [ ] 2.5 Implement `app/models/query_log.py` with the `QueryLog` model: columns for `id` (UUID), `dataset_id` (FK), `question` (text), `structured_answer` (JSON), `narrative_answer` (text), `created_at`
-  - [ ] 2.6 Update `app/models/__init__.py` to import and re-export all models so Alembic auto-detects them
-  - [ ] 2.7 Initialize Alembic with `alembic init migrations`, configure `alembic.ini` and `migrations/env.py` to read `DATABASE_URL` from config and import the SQLAlchemy Base metadata
-  - [ ] 2.8 Generate the initial migration (`alembic revision --autogenerate -m "initial schema"`) creating all four tables, and verify it applies cleanly against a fresh PostgreSQL instance
-  - [ ] 2.9 Implement all Pydantic schemas: `app/schemas/common.py` (envelope wrappers `DataResponse`, `ErrorResponse`), `app/schemas/dataset.py` (ingestion request with JSON validation, response with metadata), `app/schemas/audit.py` (create request, status response, report response), `app/schemas/finding.py` (finding detail schema matching the model), `app/schemas/query.py` (query request and response with both structured data and narrative)
+  - [ ] 2.1 Implement `app/models/database.py`: create the SQLAlchemy engine (using `DATABASE_URL` from config), a `sessionmaker`/`async_sessionmaker`, a declarative `Base` class, and a `get_db` dependency function that yields a database session
+  - [ ] 2.2 Implement `app/models/dataset.py` with a `Dataset` SQLAlchemy model: columns for `id` (UUID primary key), `name` (string), `raw_data` (JSON/JSONB), `user_count` (integer), `created_at` (timestamp with timezone)
+  - [ ] 2.3 Implement `app/models/audit.py` with an `Audit` SQLAlchemy model: columns for `id` (UUID primary key), `dataset_id` (FK to datasets), `status` (string enum: pending/running/completed/failed), `parameters` (JSON), `summary` (JSON, nullable), `started_at`, `completed_at`, `created_at` timestamps, and an `error_message` (text, nullable)
+  - [ ] 2.4 Implement `app/models/finding.py` with a `Finding` SQLAlchemy model: columns for `id` (UUID primary key), `audit_id` (FK to audits), `category` (string: overprivileged/dormant_privileged), `severity` (string: critical/high/medium/low), `principal_id` (string), `principal_name` (string), `principal_type` (string), `role_assignments` (JSON), `evidence` (JSON), `remediation` (text), `narrative` (text), `created_at`
+  - [ ] 2.5 Implement `app/models/query_log.py` with a `QueryLog` SQLAlchemy model: columns for `id` (UUID primary key), `dataset_id` (FK to datasets), `question` (text), `structured_response` (JSON), `natural_language_response` (text), `created_at`
+  - [ ] 2.6 Update `app/models/__init__.py` to import and re-export all models so Alembic can discover them
+  - [ ] 2.7 Initialize Alembic: run `alembic init migrations`, update `alembic.ini` to use `DATABASE_URL` from environment, and update `migrations/env.py` to import `Base.metadata` from `app.models`
+  - [ ] 2.8 Generate the initial Alembic migration (`alembic revision --autogenerate -m "initial schema"`) and review the generated file `migrations/versions/001_initial_schema.py` to ensure all four tables are created correctly with indexes and foreign keys
+  - [ ] 2.9 Implement all Pydantic schemas: `app/schemas/common.py` (success/error envelope), `app/schemas/dataset.py` (DatasetCreate for ingestion with JSON payload validation, DatasetResponse), `app/schemas/audit.py` (AuditCreate with dataset_id, AuditStatusResponse, AuditResultResponse with summary and findings list), `app/schemas/finding.py` (FindingSchema with all fields from FR-13), `app/schemas/query.py` (QueryRequest with question and dataset_id, QueryResponse with structured data and natural language summary)
 - [ ] 3.0 Build synthetic data generator and dataset ingestion API
-  - [ ] 3.1 Implement `scripts/generate_synthetic_data.py` using Faker (seeded for determinism) to generate ~100 users with plausible names, ~15 Azure AD directory roles (using real role names like Global Administrator, User Administrator, Security Reader, etc.), direct and group-inherited role assignments, and sign-in logs spanning 90 days with realistic patterns (weekday clustering, some zero-activity accounts)
-  - [ ] 3.2 Ensure the synthetic dataset includes at least 3–4 clearly overprivileged accounts (e.g., Global Admin with minimal sign-in activity, users with 5+ privileged roles they don't use), 3–4 clearly dormant accounts (no sign-in in 30+ days with privileged roles), and several correctly-provisioned accounts to avoid false positives
-  - [ ] 3.3 Add a ground-truth manifest to the generator output (a separate JSON key or file) that lists which user IDs should be flagged as overprivileged and which as dormant — this enables assertion in integration tests
-  - [ ] 3.4 Make the generator runnable as a CLI command (`python scripts/generate_synthetic_data.py --output data/synthetic_dataset.json`) and also importable as a function for use in tests and seeding
-  - [ ] 3.5 Implement `scripts/seed_db.py` to read the generated synthetic dataset JSON, insert it into the `datasets` table via SQLAlchemy, and print the resulting dataset ID — this script runs during Docker startup
-  - [ ] 3.6 Implement `app/services/dataset_service.py` with functions to validate incoming JSON against the expected schema (required fields: users with identifiers, role assignments with timestamps, sign-in logs), persist a dataset, and retrieve a dataset by ID
-  - [ ] 3.7 Implement `app/api/datasets.py` with `POST /api/v1/datasets` (accepts JSON body, validates, persists, returns 201 with dataset ID and metadata) and `GET /api/v1/datasets/{dataset_id}` (returns dataset metadata without the full raw data blob, or 404)
-  - [ ] 3.8 Wire the datasets router into `app/api/router.py` and register the top-level router in `app/main.py` under `/api/v1`
-  - [ ] 3.9 Manually test the endpoint: POST the synthetic dataset via curl or the Swagger UI, confirm 201 response, then GET the dataset ID and confirm metadata
+  - [ ] 3.1 Implement `scripts/generate_synthetic_data.py`: use Faker (seeded for determinism) to generate ~100 users with plausible names, UPNs, and object IDs; assign ~15 Azure AD directory roles (Global Administrator, User Administrator, Security Administrator, Privileged Role Administrator, Exchange Administrator, Security Reader, etc.); create direct and group-inherited assignments; generate sign-in logs spanning 90 days with realistic patterns (weekday clustering, some accounts dormant, some active daily)
+  - [ ] 3.2 Ensure the synthetic data includes at least 3–4 clearly overprivileged accounts (e.g., a user with Global Admin who only reads reports), 3–4 clearly dormant privileged accounts (e.g., a Global Admin with no sign-in in 60+ days), and several correctly-provisioned accounts that should NOT be flagged
+  - [ ] 3.3 Define the JSON schema for the synthetic dataset: a top-level object with `users` (array of user objects with properties, role assignments, and group memberships) and `sign_in_logs` (array of sign-in events with user ID, timestamp, and app/resource details); save a sample output to `scripts/sample_dataset.json`
+  - [ ] 3.4 Implement `app/services/ingestion.py`: validate the uploaded JSON against the expected schema (check required fields per FR-2), parse and compute `user_count`, persist as a `Dataset` record, and return the dataset ID
+  - [ ] 3.5 Implement `app/api/datasets.py` with `POST /api/v1/datasets`: accept JSON body, call the ingestion service, return `201 Created` with the dataset ID and metadata in the standard response envelope; return `422` with clear error details for validation failures
+  - [ ] 3.6 Implement `scripts/seed_database.py`: load `scripts/sample_dataset.json`, call the ingestion service to persist it, and log the resulting dataset ID; make this script idempotent (skip if a dataset already exists)
+  - [ ] 3.7 Register the datasets router in `app/api/router.py` and include it in the FastAPI app in `app/main.py`; verify the endpoint works by running the app and POSTing the sample dataset
 - [ ] 4.0 Implement audit pipeline with pre-processing, LLM provider interface, and finding detection
-  - [ ] 4.1 Implement `app/llm/base.py` with the abstract base class `BaseLLMProvider` defining two abstract methods: `analyze_findings(preprocessed_data: dict) -> list[dict]` and `answer_query(question: str, context: dict) -> dict`
-  - [ ] 4.2 Implement `app/llm/retry.py` with a retry decorator that wraps LLM calls with exponential backoff (3 attempts, configurable base delay), logging each retry attempt
-  - [ ] 4.3 Implement `app/llm/output_parsers.py` with Pydantic-based LangChain output parsers for two schemas: `OverprivilegedFinding` and `DormantFinding`, each matching the fields in the `Finding` model (category, severity, evidence, remediation, narrative)
-  - [ ] 4.4 Implement `app/llm/prompts/overprivileged_analysis.py` with a LangChain `PromptTemplate` that receives pre-processed user data and instructs the LLM to classify overprivileged accounts with severity, evidence, remediation, and narrative — include the output parser format instructions in the prompt
-  - [ ] 4.5 Implement `app/llm/prompts/dormant_analysis.py` with a LangChain `PromptTemplate` for dormant privileged role detection, receiving pre-processed data and the configurable dormant threshold in days
-  - [ ] 4.6 Implement `app/llm/openai_provider.py` as a concrete `OpenAIProvider(BaseLLMProvider)` using `langchain_openai.ChatOpenAI`, wiring in the prompt templates, output parsers, and retry decorator
-  - [ ] 4.7 Implement `app/llm/azure_openai_provider.py` as a concrete `AzureOpenAIProvider(BaseLLMProvider)` using `langchain_openai.AzureChatOpenAI`, reading Azure-specific config (endpoint, deployment name, API key)
-  - [ ] 4.8 Implement `app/llm/factory.py` with a `get_llm_provider()` function that reads `LLM_PROVIDER` from config and returns the appropriate provider instance
-  - [ ] 4.9 Implement `app/services/preprocessing.py` with functions that take raw dataset JSON and compute derived features per user: `days_since_last_signin`, `role_tier` (map each role to a tier: critical/high/medium/low based on Azure AD privilege level), `assignment_type` (direct vs. group-inherited), `privileged_role_count`, and `is_service_account` flag
-  - [ ] 4.10 Implement `app/services/audit_service.py` that orchestrates the full pipeline: (1) load dataset from DB, (2) run pre-processing, (3) batch users and call the LLM provider for overprivileged analysis, (4) batch and call for dormant analysis, (5) parse and deduplicate findings, (6) persist findings to the `findings` table, (7) compute summary stats, (8) update the audit record with status `completed` and summary — handle errors by setting status to `failed` with an error message
-  - [ ] 4.11 Implement `app/api/audits.py` with `POST /api/v1/audits` (accepts `dataset_id`, creates audit record with status `pending`, kicks off `audit_service` via FastAPI `BackgroundTasks`, returns 202 with audit ID) and `GET /api/v1/audits/{audit_id}` (returns audit status and, if completed, the full findings array and summary)
-  - [ ] 4.12 Wire the audits router into `app/api/router.py`
+  - [ ] 4.1 Implement `app/llm/base.py`: define `BaseLLMProvider` abstract class with methods `analyze_findings(preprocessed_data: dict) -> list[dict]` and `answer_query(question: str, context: dict) -> dict`; include docstrings specifying expected input/output shapes
+  - [ ] 4.2 Implement `app/llm/openai_provider.py`: concrete `OpenAIProvider` using LangChain's ChatOpenAI; configure model name and API key from settings; implement retry logic with exponential backoff (3 attempts); parse structured output using LangChain's PydanticOutputParser bound to the Finding schema
+  - [ ] 4.3 Implement `app/llm/azure_openai_provider.py`: concrete `AzureOpenAIProvider` using LangChain's AzureChatOpenAI; configure endpoint, deployment name, and API key from settings; same retry logic and output parsing as OpenAI provider
+  - [ ] 4.4 Implement `app/llm/factory.py`: factory function `get_llm_provider()` that reads `LLM_PROVIDER` from config and returns an instance of the appropriate provider class; raise a clear error if the provider is unknown or required env vars are missing
+  - [ ] 4.5 Write LangChain prompt templates: `app/llm/prompts/overprivileged_analysis.py` (system prompt defining overprivileged criteria — role tier weight, activity vs. permissions gap, direct vs. inherited; output format instructions matching FindingSchema); `app/llm/prompts/dormant_analysis.py` (system prompt defining dormant criteria — days since last sign-in exceeding threshold, role tier, no evidence of role usage)
+  - [ ] 4.6 Implement `app/services/preprocessing.py`: accept raw dataset JSON and compute derived features per user — `days_since_last_sign_in`, `role_tier` (map each role to a tier: critical/high/medium/low), `assignment_type` (direct vs. group-inherited), `privileged_role_count`, `has_recent_activity` (boolean based on DORMANT_THRESHOLD_DAYS); return a list of enriched user dicts
+  - [ ] 4.7 Implement `app/services/pipeline.py`: orchestrate the full audit — (1) load dataset from DB by ID, (2) run preprocessing to compute derived features, (3) batch users into chunks appropriate for LLM context window, (4) call LLM provider's `analyze_findings` for overprivileged detection, (5) call LLM provider's `analyze_findings` for dormant detection, (6) deduplicate and merge findings, (7) persist each finding to the `findings` table, (8) compute audit summary (counts by category and severity), (9) update audit record with status `completed` and summary; wrap everything in error handling that sets status to `failed` with error_message on exceptions
+  - [ ] 4.8 Implement `app/api/audits.py`: `POST /api/v1/audits` — validate dataset_id exists, create an audit record with status `pending`, launch the pipeline as a FastAPI `BackgroundTask`, return `202 Accepted` with audit ID; `GET /api/v1/audits/{audit_id}` — return audit status, and if completed, include summary and full findings array; return `404` if audit_id not found
+  - [ ] 4.9 Register the audits router in `app/api/router.py`; verify end-to-end by seeding data, triggering an audit via API, polling for completion, and inspecting findings in the response
 - [ ] 5.0 Implement report generation and natural-language query interface
-  - [ ] 5.1 Implement `app/services/report_service.py` with a function `generate_json_report(audit_id)` that loads the audit and its findings from the DB and assembles the structured JSON report matching FR-12 (metadata, summary, findings array)
-  - [ ] 5.2 Implement the Markdown narrative report generator in `app/services/report_service.py`: a function `generate_markdown_report(audit_id)` that uses the LLM (via the narrative report prompt template) to produce an executive-friendly Markdown summary grouping findings by severity, with 2–4 sentence plain-language explanations per finding
-  - [ ] 5.3 Implement `app/llm/prompts/narrative_report.py` with a LangChain `PromptTemplate` that receives structured findings and instructs the LLM to generate a Markdown audit report with executive summary, severity-grouped findings, and plain-language explanations
-  - [ ] 5.4 Add the report retrieval endpoint in `app/api/audits.py`: `GET /api/v1/audits/{audit_id}/report` with a `format` query parameter accepting `json` (default) or `markdown`, returning the appropriate report format
-  - [ ] 5.5 Implement `app/llm/prompts/query_answering.py` with a LangChain `PromptTemplate` for natural-language query interpretation: receives the question, dataset context (pre-processed user/role summary), and any existing audit findings, and instructs the LLM to return both a structured JSON answer and a natural-language summary
-  - [ ] 5.6 Implement `app/services/query_service.py` with a function that takes a question and dataset ID, loads relevant context from the DB (user summaries, role assignments, audit findings if available), calls the LLM via the query prompt, parses the response, logs the query to `query_logs`, and returns structured + narrative answer
-  - [ ] 5.7 Implement `app/api/query.py` with `POST /api/v1/query` accepting `{ "question": "...", "dataset_id": "..." }`, calling the query service, and returning both structured data and narrative summary — include graceful handling for unanswerable questions (FR-18)
-  - [ ] 5.8 Wire the query router into `app/api/router.py`
+  - [ ] 5.1 Implement `app/services/report.py` — structured JSON report: query the audit and its findings from DB, assemble the report object per FR-12 (audit metadata, summary with counts by category/severity, array of finding objects per FR-13)
+  - [ ] 5.2 Implement Markdown narrative report generation in `app/services/report.py`: write the `app/llm/prompts/narrative_report.py` prompt template that takes audit summary and findings as input and produces an executive-friendly Markdown document; call the LLM to generate the narrative; cache the generated Markdown on the audit record so it's only generated once
+  - [ ] 5.3 Add report retrieval to `app/api/audits.py`: implement `GET /api/v1/audits/{audit_id}/report` with a `format` query parameter accepting `json` (default) or `markdown`; return the appropriate report format; return `404` if audit not found or `400` if audit not completed
+  - [ ] 5.4 Write the `app/llm/prompts/query_answer.py` prompt template: system prompt instructs the LLM to answer questions about Azure AD role assignments using only the provided dataset context; the prompt includes instructions for returning both a structured JSON answer and a natural-language summary; the prompt must instruct the LLM to decline questions it cannot answer from the data
+  - [ ] 5.5 Implement `app/services/query_engine.py`: accept a question and dataset_id, load the dataset from DB, build the context payload (users, roles, assignments, sign-in summary), inject context into the query prompt, call the LLM provider's `answer_query`, parse the response into structured data + natural language summary, persist a `QueryLog` record, and return the formatted response
+  - [ ] 5.6 Implement `app/api/query.py` with `POST /api/v1/query`: validate request (question string, dataset_id), call the query engine, return response in standard envelope with both structured data and natural language summary; handle graceful failure if the LLM cannot answer
+  - [ ] 5.7 Register the query router in `app/api/router.py` and verify end-to-end by loading a dataset and asking sample questions via the API
 - [ ] 6.0 Build minimal web UI and serve static assets
-  - [ ] 6.1 Create `app/static/index.html` with a single-page layout: dark-themed, single-column design with a header (project title), a sidebar or stepper showing the workflow (Load Data → Run Audit → View Findings → Ask Questions), and a main content area
-  - [ ] 6.2 Create `app/static/styles.css` with dark theme styling, severity badge colors (red for critical, orange for high, yellow for medium, gray for low), card-based finding display, and responsive layout
-  - [ ] 6.3 Create `app/static/app.js` with vanilla JavaScript (or Alpine.js) implementing: (1) a "Load Sample Data" button that POSTs to `/api/v1/datasets`, (2) a "Run Audit" button that POSTs to `/api/v1/audits` and polls `GET /api/v1/audits/{audit_id}` until completion, (3) findings display with expandable details and severity badges, (4) a chat input for natural-language queries that POSTs to `/api/v1/query` and displays responses
-  - [ ] 6.4 Mount the static files directory in `app/main.py` using FastAPI's `StaticFiles` and serve `index.html` at the root URL (`/`)
-  - [ ] 6.5 Add loading spinners/states for async operations (audit polling, query processing) and error message display for API failures
-  - [ ] 6.6 Manually test the full UI flow: load data → run audit → view findings → ask a question, verifying all API interactions work through the browser
+  - [ ] 6.1 Create `app/static/index.html`: single-page layout with a dark-themed design; include sections/panels for: (1) a sidebar or stepper showing the workflow (Load Data → Run Audit → View Findings → Ask Questions), (2) a main content area for displaying results, (3) a chat input at the bottom for natural-language queries
+  - [ ] 6.2 Create `app/static/style.css`: dark color scheme, clean typography, severity badge styles (red/critical, orange/high, yellow/medium, gray/low), card-based finding display with expandable details, responsive layout for the chat interface
+  - [ ] 6.3 Create `app/static/app.js`: implement the interaction flow — (1) "Load Sample Data" button that calls `POST /api/v1/datasets` with the built-in sample data or triggers the seed endpoint, (2) "Run Audit" button that calls `POST /api/v1/audits` and then polls `GET /api/v1/audits/{id}` until completion, showing a loading indicator, (3) display findings with severity badges, expandable narratives, and the summary, (4) chat input that sends questions to `POST /api/v1/query` and displays responses
+  - [ ] 6.4 Mount the static files directory in `app/main.py` using FastAPI's `StaticFiles`; serve `index.html` at the root URL (`/`) so visitors land on the UI
+  - [ ] 6.5 Add display logic in `app.js` for the Markdown narrative report: a "View Full Report" button that fetches `GET /api/v1/audits/{id}/report?format=markdown` and renders the Markdown as formatted HTML (use a lightweight Markdown-to-HTML library like `marked.js` loaded from CDN, or pre-render server-side)
+  - [ ] 6.6 Test the full UI flow manually: docker-compose up, navigate to `http://localhost:8000/`, load data, run audit, view findings, ask a question, and verify all interactions work smoothly
 - [ ] 7.0 Add production-readiness features: rate-limiting, auth, health check, and correlation IDs
-  - [ ] 7.1 Implement `app/core/rate_limit.py` using `slowapi` to create a `Limiter` instance configured with `RATE_LIMIT_PER_MINUTE` from config, applying the default limit to all routes, and returning `429 Too Many Requests` with `Retry-After` header on excess
-  - [ ] 7.2 Register the rate-limiting middleware in `app/main.py` and add the `slowapi` exception handler for `RateLimitExceeded`
-  - [ ] 7.3 Implement `app/core/auth.py` with a FastAPI dependency that checks the `Authorization` header for a valid API key when `AUTH_ENABLED=true`, skips validation when `AUTH_ENABLED=false`, and returns 401 for invalid/missing keys
-  - [ ] 7.4 Apply the auth dependency to all API routes except `/health` by adding it as a dependency on the `/api/v1` router
-  - [ ] 7.5 Implement `app/api/health.py` with `GET /health` that verifies database connectivity (runs a simple `SELECT 1` query) and returns `{ "status": "healthy", "database": "connected" }` or appropriate error status
-  - [ ] 7.6 Wire the health route directly into the main app (not under `/api/v1` prefix) in `app/main.py`
-  - [ ] 7.7 Verify correlation IDs appear in all structured log output and response headers by making several API calls and checking log entries
+  - [ ] 7.1 Implement `app/core/rate_limit.py`: configure `slowapi` with a `Limiter` instance using client IP as the key; set default rate from `RATE_LIMIT_PER_MINUTE` config; add a custom `429` error handler that returns the standard error envelope with a `Retry-After` header
+  - [ ] 7.2 Implement `app/core/auth.py`: create a FastAPI dependency `verify_api_key` that checks the `Authorization` header against `API_KEY` from config; return `401 Unauthorized` with a clear message if the key is missing or invalid; make the dependency a no-op when `AUTH_ENABLED` is `false`
+  - [ ] 7.3 Implement `app/api/health.py` with `GET /health`: verify database connectivity by executing a simple query (e.g., `SELECT 1`); return `{"status": "healthy", "database": "connected"}` on success or `{"status": "unhealthy", "database": "disconnected"}` with status code `503` on failure
+  - [ ] 7.4 Wire rate-limiting into the FastAPI app in `app/main.py`: add the SlowAPI middleware and apply rate limits to all API routes; exclude `/health` from rate-limiting
+  - [ ] 7.5 Wire the auth dependency into the API router in `app/api/router.py`: apply `verify_api_key` as a dependency on all `/api/v1/` routes; ensure `/health` and static files are NOT protected by auth
+  - [ ] 7.6 Ensure correlation ID from `app/core/middleware.py` is injected into all log entries: verify that every structured log line includes the `correlation_id` field; add request method, path, and response status to access log entries
+  - [ ] 7.7 Add request/response logging: log every incoming API request (method, path, client IP) and outgoing response (status code, duration in ms) at INFO level using the structured logger with correlation ID
 - [ ] 8.0 Write integration and unit tests, verify coverage, and finalize documentation
-  - [ ] 8.1 Implement `tests/conftest.py` with shared fixtures: a test PostgreSQL database (using a separate test DB URL or SQLite for unit tests), a FastAPI `TestClient`, a mock LLM provider that returns deterministic canned responses, and a fixture that loads the synthetic dataset
-  - [ ] 8.2 Write unit tests in `tests/unit/test_preprocessing.py` covering all derived feature computations: days since last sign-in calculation, role tier mapping for all 15 roles, direct vs. inherited assignment detection, privileged role counting, and edge cases (missing sign-in data, users with no roles)
-  - [ ] 8.3 Write unit tests in `tests/unit/test_schema_validation.py` covering dataset JSON validation: valid payloads pass, payloads missing required fields are rejected with clear error messages, and malformed data types are caught
-  - [ ] 8.4 Write unit tests in `tests/unit/test_llm_provider_interface.py` covering the provider factory (correct provider returned for each `LLM_PROVIDER` value, error on invalid value), and `tests/unit/test_output_parsers.py` covering output parser behavior with valid and malformed LLM responses
-  - [ ] 8.5 Write unit tests in `tests/unit/test_report_service.py` covering JSON report assembly (correct metadata, summary stats, finding count) and Markdown report generation (with mocked LLM)
-  - [ ] 8.6 Write unit tests in `tests/unit/test_auth.py` verifying auth dependency allows requests when disabled, blocks without key when enabled, and allows with valid key; write `tests/unit/test_rate_limit.py` verifying 429 responses after exceeding the limit
-  - [ ] 8.7 Write integration tests in `tests/integration/test_dataset_ingestion.py`: POST a dataset, verify 201 and persisted record; POST invalid data, verify 422 with error message
-  - [ ] 8.8 Write integration tests in `tests/integration/test_audit_pipeline.py`: ingest the synthetic dataset, trigger an audit, poll until completed, verify that known overprivileged and dormant accounts from the ground-truth manifest are present in findings, and verify that correctly-provisioned accounts are not flagged (false positive check)
-  - [ ] 8.9 Write integration tests in `tests/integration/test_report_output.py`: after a completed audit, GET the JSON report and verify structure matches FR-12/FR-13, GET the Markdown report and verify it contains severity sections and finding narratives
-  - [ ] 8.10 Write integration tests in `tests/integration/test_query_endpoint.py`: POST sample questions ("show users with Global Admin who haven't signed in for 30 days", "how many users have more than 3 privileged roles"), verify structured and narrative responses; POST an unanswerable question and verify graceful handling
-  - [ ] 8.11 Write `tests/integration/test_health.py` verifying the health endpoint returns 200 with database status
-  - [ ] 8.12 Run full test suite with coverage: `pytest --cov=app --cov-report=term-missing --cov-report=html`, verify ≥80% line coverage on core modules, and address any coverage gaps
-  - [ ] 8.13 Finalize `README.md`: add architecture diagram (text-based or image), setup instructions (Docker and local), API reference (link to `/docs`), sample usage walkthrough (curl examples for each endpoint), environment variable reference, and testing instructions
-  - [ ] 8.14 Run `docker-compose up` from a clean state and verify the full demo flow works end-to-end: database migrates, seed data loads, UI is accessible, audit runs, and queries return results — all within the 2-minute startup target
+  - [ ] 8.1 Implement `tests/conftest.py`: set up a test database (use a separate PostgreSQL database or SQLite for speed), create all tables, provide fixtures for a test FastAPI `TestClient`, a database session, sample dataset JSON, and a mock LLM provider that returns deterministic findings
+  - [ ] 8.2 Write unit tests in `tests/unit/test_schemas.py`: test all Pydantic schemas with valid data, test validation rejects missing required fields, test edge cases (empty arrays, boundary values for severity/category enums)
+  - [ ] 8.3 Write unit tests in `tests/unit/test_preprocessing.py`: test `days_since_last_sign_in` calculation, `role_tier` mapping for all known roles, `assignment_type` detection (direct vs. inherited), `privileged_role_count` aggregation; use fixed sample user data
+  - [ ] 8.4 Write unit tests in `tests/unit/test_ingestion.py`: test successful dataset validation and persistence, test rejection of malformed JSON (missing users array, missing required fields), test idempotent behavior
+  - [ ] 8.5 Write unit tests in `tests/unit/test_llm_factory.py` and `tests/unit/test_llm_providers.py`: test factory returns correct provider for each `LLM_PROVIDER` value, test factory raises error for unknown provider, test providers call LangChain with expected prompts (mock the LLM), test retry logic triggers on transient failures
+  - [ ] 8.6 Write unit tests in `tests/unit/test_report.py`: test structured JSON report includes all required fields, test Markdown report generation with a mocked LLM narrative
+  - [ ] 8.7 Write unit tests in `tests/unit/test_query_engine.py`: test query engine constructs correct context and prompt, test response parsing with mocked LLM, test graceful handling when LLM indicates it cannot answer
+  - [ ] 8.8 Write unit tests in `tests/unit/test_auth.py` and `tests/unit/test_rate_limit.py`: test auth dependency passes with valid key and rejects invalid key, test auth is skipped when AUTH_ENABLED is false, test rate limiter returns 429 with Retry-After header when limit exceeded
+  - [ ] 8.9 Write integration tests in `tests/integration/test_dataset_api.py`: POST valid dataset and verify 201 response with dataset ID; POST invalid dataset and verify 422 with error details
+  - [ ] 8.10 Write integration tests in `tests/integration/test_audit_pipeline.py`: seed a dataset, trigger an audit via POST, poll until completed, verify findings include the known overprivileged and dormant accounts from the synthetic data, verify no false positives for correctly-provisioned accounts, verify report endpoints return valid JSON and Markdown
+  - [ ] 8.11 Write integration tests in `tests/integration/test_query_api.py`: seed a dataset, ask known-answer questions (e.g., "which users have Global Administrator?"), verify the structured response contains expected users, verify natural language summary is non-empty
+  - [ ] 8.12 Write integration tests in `tests/integration/test_health.py`: verify GET /health returns 200 with healthy status when DB is available
+  - [ ] 8.13 Run `pytest --cov=app --cov-report=term-missing` and verify coverage is ≥80% on `app/` modules; add additional tests for any uncovered critical paths
+  - [ ] 8.14 Finalize `README.md`: write project overview, add an architecture diagram (text-based or linked image), document setup instructions (Docker and local), link to Swagger docs at `/docs`, provide sample curl commands for each endpoint, describe the synthetic data and expected findings, and add a "How It Works" section explaining the pipeline flow
+  - [ ] 8.15 Run `docker-compose up` from a clean state and verify the full demo flow works end-to-end: migrations run, data is seeded, web UI loads, audit can be triggered, findings display correctly, and queries return answers
