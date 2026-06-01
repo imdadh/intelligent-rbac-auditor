@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Distribution / packaging
+*.whl
+*.tar.gz
+SDIST/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# mypy
+.mypy_cache/
+
+# ruff
+.ruff_cache/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Environment variable files — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+postgres_data/
+
+# Generated data
+data/
+*.json.bak
+
+# Alembic — keep migrations, ignore auto-generated temp files
+migrations/versions/*.pyc
+
+# Logs
+logs/
+*.log
