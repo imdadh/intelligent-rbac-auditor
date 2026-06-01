@@ -87,7 +87,7 @@
   - [x] 0.3 Add `__init__.py` files to all Python packages (`app/`, `app/api/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/llm/`, `tests/`, `tests/unit/`, `tests/integration/`)
   - [x] 0.4 Create `pyproject.toml` with project metadata, Python 3.11+ requirement, and all dependencies listed in the PRD (FastAPI, Uvicorn, SQLAlchemy 2.0, Alembic, LangChain, langchain-openai, Pydantic v2, structlog, slowapi, httpx, psycopg2-binary/asyncpg, Faker, pytest, pytest-asyncio, pytest-cov)
   - [x] 0.5 Create `.env.example` listing every environment variable from the PRD table with placeholder values and comments
-  - [ ] 0.6 Create a minimal `README.md` with project title, one-paragraph overview, and a "Setup" section placeholder
+  - [x] 0.6 Create a minimal `README.md` with project title, one-paragraph overview, and a "Setup" section placeholder
   - [ ] 0.7 Make an initial commit with the empty project scaffold
 - [ ] 1.0 Set up configuration, structured logging, and Docker/Compose infrastructure
   - [ ] 1.1 Implement `app/core/config.py` using Pydantic `BaseSettings` to read all environment variables from the PRD table (`DATABASE_URL`, `LLM_PROVIDER`, `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AUTH_ENABLED`, `API_KEY`, `RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL`, `DORMANT_THRESHOLD_DAYS`) with their documented defaults
