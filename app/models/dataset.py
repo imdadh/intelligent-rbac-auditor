@@ -25,7 +25,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -93,6 +93,18 @@ class Dataset(Base):
         nullable=False,
         server_default=func.now(),
         comment="UTC timestamp of dataset ingestion.",
+    )
+
+    # ------------------------------------------------------------------
+    # Relationships
+    # ------------------------------------------------------------------
+
+    #: All audit runs that reference this dataset.
+    audits: Mapped[list["Audit"]] = relationship(  # type: ignore[name-defined]
+        "Audit",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
     def __repr__(self) -> str:  # pragma: no cover
