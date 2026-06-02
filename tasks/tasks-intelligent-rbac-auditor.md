@@ -90,7 +90,7 @@
   - [ ] 0.7 Create a skeleton `README.md` with project title, one-paragraph overview, and placeholder sections for Architecture, Setup, API Reference, and Usage
 - [ ] 1.0 Set up configuration, structured logging, and Docker/Compose infrastructure
   - [x] 1.1 Implement `app/core/config.py` using Pydantic `BaseSettings` to load all environment variables from the PRD table, with proper types, defaults, and validation (e.g., `LLM_PROVIDER` must be one of `openai` or `azure_openai`)
-  - [ ] 1.2 Implement `app/core/logging.py` to configure `structlog` for structured JSON logging; log level must be read from `config.LOG_LEVEL`; ensure logger outputs JSON to stdout with timestamp, level, logger name, and a correlation_id field
+  - [x] 1.2 Implement `app/core/logging.py` to configure `structlog` for structured JSON logging; log level must be read from `config.LOG_LEVEL`; ensure logger outputs JSON to stdout with timestamp, level, logger name, and a correlation_id field
   - [ ] 1.3 Implement `app/core/middleware.py` with a correlation ID middleware that generates a UUID for each incoming request (or reads one from an `X-Correlation-ID` header), stores it in context, and adds it to the response headers
   - [ ] 1.4 Create `app/main.py` with the FastAPI application factory: instantiate the app, add the correlation ID middleware, configure exception handlers, and mount a placeholder root route returning `{"status": "ok"}`
   - [ ] 1.5 Create `Dockerfile` using a multi-stage build: install dependencies in a builder stage, copy the app into a slim runtime image, expose port 8000, and set the entrypoint to `uvicorn app.main:app --host 0.0.0.0 --port 8000`
