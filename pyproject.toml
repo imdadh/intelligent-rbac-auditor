@@ -145,7 +145,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S", "B", "RUF012"]  # mutable class attrs in test classes
-"scripts/*" = ["S", "E501", "F841"]
+"scripts/*" = ["S", "E501", "F841", "RUF"]  # data-gen scripts: all RUF rules suppressed
 "migrations/*" = ["E501"]  # auto-generated migration files
 
 [tool.ruff.lint.isort]

@@ -1,41 +1,52 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """Deterministic synthetic Azure AD tenant snapshot generator.
 
-Produces a JSON file that conforms to the ``AzureADDatasetPayload`` schema
-defined in ``app/schemas/dataset_schema.py``.  The output is suitable for
-loading via ``POST /api/v1/datasets``, seeding the demo database, and
-driving integration tests.
+Produces a JSON file that mirrors the structure of a real Azure AD role-assignment
+export as defined in ``app/schemas/dataset_schema.py``.  The output is used for
+integration tests, local development, and the public demo.
 
 Design constraints
 ------------------
-* **Deterministic** — a fixed Faker/random seed guarantees the same output
-  on every run, making tests and demos reproducible.
-* **Ground-truth manifest** — a companion ``ground_truth.json`` file is
-  written alongside the dataset documenting which principals are expected
-  to be flagged, their expected category, and the reason.  Integration
-  tests import this file to assert correct pipeline behaviour.
-* **Realistic feel** — display names are plausible, role names match real
-  Azure AD built-in roles, sign-in timestamps cluster on weekdays during
-  business hours, and IP addresses use the RFC 5737 documentation range.
-* **Deliberate audit targets** — the generator hard-codes four overprivileged
-  accounts and four dormant privileged accounts with unambiguous signal so
-  that the detection pipeline has clear positive cases to identify.
+* **Deterministic output** — Faker and the ``random`` module are seeded with a
+  fixed value (``SEED = 42``) so that the same JSON is produced on every run.
+  Tests can assert specific findings against named accounts.
+* **Ground-truth personas** — Before generating bulk random accounts, a set of
+  hard-coded personas is injected that guarantees the expected finding categories:
+
+  Overprivileged accounts (4):
+    - Marcus Webb      — Global Admin whose only sign-ins are to Teams/Office
+    - Diana Okafor     — Privileged Role Administrator who signs in via mobile
+                         apps only, never Azure management tooling
+    - Ryan Kowalski    — Helpdesk Admin + Security Admin + User Admin stacked
+                         on a junior support account with minimal activity
+    - svc-reporting    — ServicePrincipal with Global Admin, last sign-in >45d
+
+  Dormant privileged accounts (4):
+    - Trevor Blanchard — Global Admin, no sign-in in 65 days
+    - Priya Subramaniam — Privileged Role Administrator, no sign-in in 55 days
+    - svc-legacy-sync  — ServicePrincipal with User Administrator, no activity
+                         in 90 days
+    - Chen Wei         — Exchange Administrator + Security Administrator,
+                         no sign-in in 40 days
+
+  Correctly provisioned accounts (several):
+    - Alice Johnson    — Global Admin with regular Azure management sign-ins
+    - Bob Martinez     — Security Reader with recent activity (low-tier role)
+    - Carol Nguyen     — User Administrator with recent regular sign-ins
+    - svc-monitoring   — ServicePrincipal with Security Reader only, active
+
+* **Approximately 100 users total** — bulk random accounts fill in the rest,
+  weighted toward standard/low-privilege roles with realistic activity patterns.
+* **Real Azure AD role GUIDs** — role definition IDs match actual built-in roles
+  so the data is meaningful to engineers familiar with Entra ID.
 
 Usage
 -----
-::
-
     python scripts/generate_synthetic_data.py
-    python scripts/generate_synthetic_data.py --output data/my_dataset.json
-    python scripts/generate_synthetic_data.py --seed 99 --output data/alt.json
+    # Writes: scripts/sample_dataset.json  (default)
 
-Outputs
--------
-``data/sample_dataset.json``
-    The full tenant snapshot payload.
-
-``data/ground_truth.json``
-    A list of expected findings for integration test assertions.
+    python scripts/generate_synthetic_data.py --output data/custom.json
+    # Writes to the specified path instead.
 """
 
 from __future__ import annotations
@@ -43,700 +54,1165 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import sys
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 from faker import Faker
 
 # ---------------------------------------------------------------------------
-# Constants — Azure AD built-in roles (real definition IDs)
+# Seed for reproducibility
 # ---------------------------------------------------------------------------
 
-# Each tuple: (display_name, role_definition_id, tier)
-# Tier 0 = global control; tier 1 = elevated; tier 2 = read-only/narrow
-AZURE_AD_ROLES: list[tuple[str, str, int]] = [
-    # Tier 0
-    ("Global Administrator", "62e90394-69f5-4237-9190-012177145e10", 0),
-    ("Privileged Role Administrator", "fe930be7-5e62-47db-91af-98c3a49a38b1", 0),
-    (
-        "Privileged Authentication Administrator",
-        "7be44c8a-adaf-4e2a-84d6-ab2649e08a13",
-        0,
-    ),
-    # Tier 1
-    ("User Administrator", "d37c8bed-0711-4417-ba38-b4abe66ce4c2", 1),
-    ("Security Administrator", "194ae4cb-b126-40b2-bd5b-6091b380977d", 1),
-    ("Exchange Administrator", "29232cdf-9323-42fd-ade2-1d097af3e4de", 1),
-    ("SharePoint Administrator", "f28a1f50-f6e7-4571-818b-6a12f2af6b6c", 1),
-    ("Compliance Administrator", "17315797-102d-40b4-93e0-432062caca18", 1),
-    ("Helpdesk Administrator", "729827e3-9c14-49f7-bb1b-9608f156bbb8", 1),
-    ("Application Administrator", "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3", 1),
-    ("Cloud Application Administrator", "158c047a-c907-4556-b7ef-446551a6b5f7", 1),
-    ("Authentication Administrator", "c4e39bd9-1100-46d3-8c65-fb160da0071f", 1),
-    # Tier 2
-    ("Directory Readers", "88d8e3e3-8f55-4a1e-953a-9b9898b8876b", 2),
-    ("Security Reader", "5d6b6bb7-de71-4623-b4af-96380a352509", 2),
-    ("Reports Reader", "4a5d8f65-41da-4de4-8968-e035b65339cf", 2),
-]
-
-# Role name → (definition_id, tier) lookup
-ROLE_BY_NAME: dict[str, tuple[str, int]] = {
-    name: (rid, tier) for name, rid, tier in AZURE_AD_ROLES
-}
-
-# Realistic applications that appear in Azure AD sign-in logs
-APP_NAMES: list[str] = [
-    "Microsoft Teams",
-    "Microsoft Office",
-    "Office 365 Exchange Online",
-    "Microsoft Azure Management",
-    "Windows Sign In",
-    "Microsoft Graph",
-    "Azure Active Directory PowerShell",
-    "Microsoft 365 Admin Center",
-]
+SEED = 42
+random.seed(SEED)
+fake = Faker()
+Faker.seed(SEED)
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Snapshot anchor — all relative timestamps are computed from this point
 # ---------------------------------------------------------------------------
+
+# Fix the snapshot date so generated timestamps are stable across runs.
+SNAPSHOT_DATE = datetime(2024, 11, 15, 12, 0, 0, tzinfo=UTC)
+OBSERVATION_WINDOW_DAYS = 90
 
 
 def _ts(dt: datetime) -> str:
-    """Return an ISO 8601 UTC string with Z suffix."""
+    """Format a datetime as an ISO 8601 UTC string with Z suffix."""
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _random_business_datetime(
-    rng: random.Random,
-    start: datetime,
-    end: datetime,
-) -> datetime:
-    """Return a random datetime between *start* and *end* weighted toward
-    weekday business hours (08:00–18:00 UTC) to mimic realistic sign-in
-    patterns.
+def _days_ago(n: int, jitter_minutes: int = 0) -> datetime:
+    """Return SNAPSHOT_DATE minus *n* days, with optional minute-level jitter."""
+    base = SNAPSHOT_DATE - timedelta(days=n)
+    if jitter_minutes:
+        base += timedelta(minutes=random.randint(-jitter_minutes, jitter_minutes))
+    return base
 
-    The function makes up to 20 attempts to land on a weekday; if all
-    attempts produce a weekend it returns the last candidate anyway so
-    the distribution never stalls.
+
+def _uid() -> str:
+    """Return a new deterministic UUID string."""
+    return str(uuid.UUID(int=random.getrandbits(128), version=4))
+
+
+# ---------------------------------------------------------------------------
+# Azure AD built-in role catalogue
+# Real role definition IDs — stable across tenants for built-in roles.
+# ---------------------------------------------------------------------------
+
+ROLES: list[dict] = [
+    # Tier 0
+    {
+        "id": "62e90394-69f5-4237-9190-012177145e10",
+        "name": "Global Administrator",
+        "tier": 0,
+    },
+    {
+        "id": "fe930be7-5e62-47db-91af-98c3a49a38b1",
+        "name": "Privileged Role Administrator",
+        "tier": 0,
+    },
+    {
+        "id": "7be44c8a-adaf-4e2a-84d6-ab2649e08a13",
+        "name": "Privileged Authentication Administrator",
+        "tier": 0,
+    },
+    # Tier 1
+    {
+        "id": "fe930be7-5e62-47db-91af-98c3a49a38b2",
+        "name": "User Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "194ae4cb-b126-40b2-bd5b-6091b380977d",
+        "name": "Security Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "29232cdf-9323-42fd-ade2-1d097af3e4de",
+        "name": "Exchange Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "f28a1f50-f6e7-4571-818b-6a12f2af6b6c",
+        "name": "SharePoint Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "17315797-102d-40b4-93e0-432062caca18",
+        "name": "Compliance Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "729827e3-9c14-49f7-bb1b-9608f156bbb8",
+        "name": "Helpdesk Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3",
+        "name": "Application Administrator",
+        "tier": 1,
+    },
+    {
+        "id": "158c047a-c907-4556-b7ef-446551a6b5f7",
+        "name": "Cloud Application Administrator",
+        "tier": 1,
+    },
+    # Tier 2
+    {
+        "id": "88d8e3e3-8f55-4a1e-953a-9b9898b8876b",
+        "name": "Directory Readers",
+        "tier": 2,
+    },
+    {
+        "id": "5d6b6bb7-de71-4623-b4af-96380a352509",
+        "name": "Security Reader",
+        "tier": 2,
+    },
+    {"id": "4a5d8f65-41da-4de4-8968-e035b65339cf", "name": "Reports Reader", "tier": 2},
+    {
+        "id": "790c1fb9-7f7d-4f88-86a1-ef1f95c05c1b",
+        "name": "Message Center Reader",
+        "tier": 2,
+    },
+]
+
+ROLE_BY_NAME: dict[str, dict] = {r["name"]: r for r in ROLES}
+ROLE_BY_ID: dict[str, dict] = {r["id"]: r for r in ROLES}
+
+# Roles available for random assignment to bulk users.
+# Weighted: most bulk users get low-privilege roles.
+BULK_ROLE_POOL: list[dict] = [
+    ROLE_BY_NAME["Security Reader"],
+    ROLE_BY_NAME["Directory Readers"],
+    ROLE_BY_NAME["Reports Reader"],
+    ROLE_BY_NAME["Message Center Reader"],
+    ROLE_BY_NAME["Helpdesk Administrator"],
+    ROLE_BY_NAME["User Administrator"],
+]
+
+BULK_ROLE_WEIGHTS = [30, 20, 15, 10, 15, 10]
+
+# Common apps seen in Azure AD sign-in logs.
+APPS = [
+    "Microsoft Teams",
+    "Microsoft Office",
+    "Office 365 Exchange Online",
+    "Windows Sign In",
+    "Microsoft MyApps",
+    "Azure Active Directory PowerShell",
+    "Microsoft Graph",
+    "Microsoft Azure Management",
+]
+
+NON_ADMIN_APPS = [
+    "Microsoft Teams",
+    "Microsoft Office",
+    "Office 365 Exchange Online",
+    "Windows Sign In",
+    "Microsoft MyApps",
+]
+
+ADMIN_APPS = [
+    "Microsoft Azure Management",
+    "Azure Active Directory PowerShell",
+    "Microsoft Graph",
+]
+
+
+# ---------------------------------------------------------------------------
+# Sign-in log helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_sign_in(
+    log_id: str,
+    user_id: str,
+    display_name: str,
+    days_ago_value: int,
+    app: str,
+    status: str = "Success",
+) -> dict:
+    """Build a single sign-in log entry."""
+    ts = _days_ago(days_ago_value, jitter_minutes=120)
+    return {
+        "id": log_id,
+        "userId": user_id,
+        "userDisplayName": display_name,
+        "signInTimestamp": _ts(ts),
+        "appDisplayName": app,
+        "status": status,
+        "ipAddress": fake.ipv4_public(),
+    }
+
+
+def _workday_sign_ins(
+    user_id: str,
+    display_name: str,
+    start_counter: int,
+    days_range: tuple[int, int],
+    app_pool: list[str],
+    count: int = 12,
+) -> tuple[list[dict], int]:
+    """Generate *count* weekday-clustered sign-in entries over *days_range*.
+
+    Returns the list of log entries and the updated counter.
     """
-    delta_seconds = int((end - start).total_seconds())
-    for _ in range(20):
-        offset = timedelta(
-            seconds=rng.randint(0, delta_seconds),
-            hours=rng.randint(0, 10),  # skew toward daytime
+    entries: list[dict] = []
+    used_days: set[int] = set()
+    counter = start_counter
+    attempts = 0
+    while len(entries) < count and attempts < count * 5:
+        attempts += 1
+        day = random.randint(*days_range)
+        # Approximate weekday check: day offset from snapshot.
+        candidate = SNAPSHOT_DATE - timedelta(days=day)
+        if candidate.weekday() >= 5:  # Saturday=5, Sunday=6
+            continue
+        if day in used_days:
+            continue
+        used_days.add(day)
+        app = random.choice(app_pool)
+        entries.append(
+            _make_sign_in(
+                f"sl-{counter:06d}",
+                user_id,
+                display_name,
+                day,
+                app,
+            )
         )
-        candidate = start + offset
-        # Monday=0, Friday=4
-        if candidate.weekday() < 5:
-            return candidate
-    return start + timedelta(seconds=rng.randint(0, delta_seconds))
-
-
-def _fake_ip(rng: random.Random) -> str:
-    """Return an IP from the RFC 5737 documentation range (203.0.113.x)."""
-    return f"203.0.113.{rng.randint(1, 254)}"
-
-
-def _uuid(fake: Faker) -> str:
-    """Return a lower-case UUID4 string."""
-    return str(fake.uuid4())
+        counter += 1
+    return entries, counter
 
 
 # ---------------------------------------------------------------------------
-# Generator
+# Role assignment helper
 # ---------------------------------------------------------------------------
 
 
-def generate(
-    seed: int = 42,
-    snapshot_date: datetime | None = None,
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Generate a synthetic Azure AD tenant snapshot and a ground-truth manifest.
+def _make_ra(
+    ra_id: str,
+    principal_id: str,
+    role: dict,
+    assignment_type: str = "direct",
+    assigned_via: str | None = None,
+    assigned_at_days_ago: int = 400,
+) -> dict:
+    """Build a single role assignment entry."""
+    return {
+        "id": ra_id,
+        "principalId": principal_id,
+        "roleDefinitionId": role["id"],
+        "roleName": role["name"],
+        "assignmentType": assignment_type,
+        "assignedVia": assigned_via,
+        "assignedAt": _ts(_days_ago(assigned_at_days_ago)),
+    }
 
-    Parameters
-    ----------
-    seed:
-        RNG seed for deterministic output.  Pass any integer; the default
-        (42) is used for the committed sample dataset.
-    snapshot_date:
-        The point-in-time the snapshot represents.  Defaults to
-        ``2025-01-15T00:00:00Z`` so that the committed sample is stable
-        regardless of when the generator runs.
 
-    Returns
-    -------
-    tuple[dict, list]
-        ``(dataset_payload, ground_truth_findings)`` where
-        ``dataset_payload`` conforms to ``AzureADDatasetPayload`` and
-        ``ground_truth_findings`` is a list of dicts describing which
-        principals are expected to trigger audit findings.
+# ---------------------------------------------------------------------------
+# Ground-truth persona definitions
+# ---------------------------------------------------------------------------
+# Each persona is a dict carrying enough fields to build the user, role
+# assignments, and sign-in logs.  These are processed first so their IDs are
+# stable across generator runs.
+
+
+def _build_ground_truth_accounts(
+    sign_in_counter: int,
+    ra_counter: int,
+) -> tuple[
+    list[dict],  # users
+    list[dict],  # role_assignments
+    list[dict],  # sign_in_logs
+    int,  # updated sign_in_counter
+    int,  # updated ra_counter
+]:
+    """Construct the hard-coded personas that underpin audit test assertions.
+
+    Returns populated lists for users, role_assignments, and sign_in_logs
+    plus the updated running counters.
     """
-    if snapshot_date is None:
-        snapshot_date = datetime(2025, 1, 15, 0, 0, 0, tzinfo=UTC)
+    users: list[dict] = []
+    role_assignments: list[dict] = []
+    sign_in_logs: list[dict] = []
 
-    fake = Faker()
-    Faker.seed(seed)
-    rng = random.Random(seed)
+    sc = sign_in_counter  # sign-in log counter
+    rc = ra_counter  # role assignment counter
 
-    observation_start = snapshot_date - timedelta(days=90)
-
-    # ---------------------------------------------------------------
-    # Role-name lookup helpers
-    # ---------------------------------------------------------------
-    def role(name: str) -> dict[str, str]:
-        rid, _ = ROLE_BY_NAME[name]
-        return {"name": name, "id": rid}
-
-    # ---------------------------------------------------------------
-    # 1. Users
-    # ---------------------------------------------------------------
-    # We build users in labelled categories so we can later assign
-    # roles and sign-in patterns with full control over the "ground truth".
-
-    users: list[dict[str, Any]] = []
-
-    def _make_user(
-        uid: str,
-        display_name: str,
-        upn: str,
-        user_type: str,
-        account_enabled: bool = True,
-    ) -> dict[str, Any]:
-        return {
-            "id": uid,
-            "displayName": display_name,
-            "userPrincipalName": upn,
-            "userType": user_type,
-            "accountEnabled": account_enabled,
-        }
-
-    domain = "contoso.onmicrosoft.com"
-
-    # -- Anchor principals (fixed IDs for test assertions) --
-
-    # Overprivileged set: holds Global Admin / Privileged Role Admin but
-    # only does mundane work (Teams, Office).  The activity profile does
-    # NOT include Azure Management or admin-portal sign-ins.
-    OP1_ID = "op000001-0000-0000-0000-000000000001"
-    OP2_ID = "op000002-0000-0000-0000-000000000002"
-    OP3_ID = "op000003-0000-0000-0000-000000000003"
-    OP4_ID = "op000004-0000-0000-0000-000000000004"
-
-    # Dormant set: holds Tier 0 / Tier 1 roles, last sign-in >45 days ago
-    DP1_ID = "dp000001-0000-0000-0000-000000000001"
-    DP2_ID = "dp000002-0000-0000-0000-000000000002"
-    DP3_ID = "dp000003-0000-0000-0000-000000000003"
-    DP4_ID = "dp000004-0000-0000-0000-000000000004"
-
-    # Correctly provisioned set: roles match activity; recent sign-ins
-    CP1_ID = "cp000001-0000-0000-0000-000000000001"
-    CP2_ID = "cp000002-0000-0000-0000-000000000002"
-    CP3_ID = "cp000003-0000-0000-0000-000000000003"
-
-    anchor_principals = [
-        # Overprivileged accounts
-        _make_user(OP1_ID, "Marcus Webb", f"marcus.webb@{domain}", "Member"),
-        _make_user(OP2_ID, "Priya Nair", f"priya.nair@{domain}", "Member"),
-        _make_user(OP3_ID, "Jordan Ellis", f"jordan.ellis@{domain}", "Member"),
-        _make_user(OP4_ID, "Chloe Okonkwo", f"chloe.okonkwo@{domain}", "Guest"),
-        # Dormant privileged accounts
-        _make_user(DP1_ID, "Ethan Blackwood", f"ethan.blackwood@{domain}", "Member"),
-        _make_user(DP2_ID, "Sofia Andersen", f"sofia.andersen@{domain}", "Member"),
-        _make_user(
-            DP3_ID, "svc-backup-agent", f"svc-backup-agent@{domain}", "ServicePrincipal"
-        ),
-        _make_user(
-            DP4_ID, "svc-deploy-prod", f"svc-deploy-prod@{domain}", "ServicePrincipal"
-        ),
-        # Correctly provisioned accounts
-        _make_user(CP1_ID, "Amara Osei", f"amara.osei@{domain}", "Member"),
-        _make_user(CP2_ID, "Henrik Larsson", f"henrik.larsson@{domain}", "Member"),
-        _make_user(CP3_ID, "Fatima Al-Rashid", f"fatima.alrashid@{domain}", "Member"),
-    ]
-
-    anchor_ids = {u["id"] for u in anchor_principals}
-    users.extend(anchor_principals)
-
-    # -- Filler users: regular members, a handful of guests --
-    filler_ids: list[str] = []
-    for _ in range(89):  # total users ≈ 100 (11 anchor + 89 filler)
-        uid = _uuid(fake)
-        first = fake.first_name()
-        last = fake.last_name()
-        upn = f"{first.lower()}.{last.lower()}@{domain}"
-        user_type = rng.choices(
-            ["Member", "Guest"],
-            weights=[90, 10],
-        )[0]
-        users.append(_make_user(uid, f"{first} {last}", upn, user_type))
-        filler_ids.append(uid)
-
-    # ---------------------------------------------------------------
-    # 2. Groups
-    # ---------------------------------------------------------------
-    # Five groups: two role-assignable (Tier 0 and Tier 1), three regular.
-
-    TIER0_GROUP_ID = "grp00000-tier0-0000-0000-000000000001"
-    TIER1_GROUP_ID = "grp00000-tier1-0000-0000-000000000002"
-    HELPDESK_GROUP_ID = "grp00000-help-0000-0000-000000000003"
-    READERS_GROUP_ID = "grp00000-read-0000-0000-000000000004"
-    COMPLIANCE_GROUP_ID = "grp00000-comp-0000-0000-000000000005"
-
-    # DP2 inherits Privileged Role Administrator through Tier0-Admins group
-    # Some filler users get group memberships for realism
-    tier0_members = [DP2_ID, *rng.sample(filler_ids, 2)]
-    tier1_members = [CP1_ID, CP2_ID, *rng.sample(filler_ids, 5)]
-    helpdesk_members = rng.sample(filler_ids, 8)
-    readers_members = rng.sample(filler_ids, 12)
-    compliance_members = [CP3_ID, *rng.sample(filler_ids, 4)]
-
-    groups: list[dict[str, Any]] = [
+    # -----------------------------------------------------------------------
+    # OVERPRIVILEGED ACCOUNTS
+    # -----------------------------------------------------------------------
+    # OP-1: Marcus Webb — Global Admin, only signs in to non-admin apps
+    # Justification: holds the most powerful role but zero Azure management
+    # activity; all sign-ins are consumer-grade (Teams, Office).
+    # -----------------------------------------------------------------------
+    marcus_id = "op-user-0001-marcus-webb-000000000001"
+    users.append(
         {
-            "id": TIER0_GROUP_ID,
+            "id": marcus_id,
+            "displayName": "Marcus Webb",
+            "userPrincipalName": "marcus.webb@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            marcus_id,
+            ROLE_BY_NAME["Global Administrator"],
+            assigned_at_days_ago=550,
+        )
+    )
+    rc += 1
+    # Sign-ins only to non-admin apps, recent enough to avoid dormancy flag.
+    for day, app in [
+        (3, "Microsoft Teams"),
+        (5, "Microsoft Office"),
+        (8, "Microsoft Office"),
+        (12, "Office 365 Exchange Online"),
+        (15, "Microsoft Teams"),
+        (20, "Microsoft Office"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", marcus_id, "Marcus Webb", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # OP-2: Diana Okafor — Privileged Role Administrator, mobile-only sign-ins
+    # Justification: Tier 0 role, active account, but usage pattern (mobile,
+    # consumer apps) is inconsistent with privileged administration duties.
+    # -----------------------------------------------------------------------
+    diana_id = "op-user-0002-diana-okafor-000000000002"
+    users.append(
+        {
+            "id": diana_id,
+            "displayName": "Diana Okafor",
+            "userPrincipalName": "diana.okafor@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            diana_id,
+            ROLE_BY_NAME["Privileged Role Administrator"],
+            assigned_at_days_ago=480,
+        )
+    )
+    rc += 1
+    for day, app in [
+        (2, "Microsoft Teams"),
+        (4, "Microsoft Office"),
+        (7, "Office 365 Exchange Online"),
+        (11, "Microsoft Teams"),
+        (16, "Microsoft Office"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", diana_id, "Diana Okafor", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # OP-3: Ryan Kowalski — role accumulation (Helpdesk + Security Admin +
+    # User Admin) on what should be a limited support account.
+    # Justification: three privileged roles on a junior-pattern account;
+    # sign-in activity is present but through helpdesk tooling only.
+    # -----------------------------------------------------------------------
+    ryan_id = "op-user-0003-ryan-kowalski-000000000003"
+    users.append(
+        {
+            "id": ryan_id,
+            "displayName": "Ryan Kowalski",
+            "userPrincipalName": "ryan.kowalski@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    for role_name, age in [
+        ("Helpdesk Administrator", 600),
+        ("Security Administrator", 400),
+        ("User Administrator", 200),
+    ]:
+        role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                ryan_id,
+                ROLE_BY_NAME[role_name],
+                assigned_at_days_ago=age,
+            )
+        )
+        rc += 1
+    for day, app in [
+        (1, "Microsoft Teams"),
+        (3, "Office 365 Exchange Online"),
+        (6, "Microsoft Office"),
+        (9, "Microsoft Teams"),
+        (14, "Office 365 Exchange Online"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", ryan_id, "Ryan Kowalski", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # OP-4: svc-reporting — ServicePrincipal with Global Admin, last active 47d
+    # Justification: service account holding tenant's highest privilege with
+    # a sign-in pattern that predates last activity by 47 days — not quite
+    # dormant by the default threshold but clearly overprivileged for a
+    # reporting service.
+    # -----------------------------------------------------------------------
+    svc_reporting_id = "op-user-0004-svc-reporting-0000000000004"
+    users.append(
+        {
+            "id": svc_reporting_id,
+            "displayName": "svc-reporting",
+            "userPrincipalName": "svc-reporting@contoso.onmicrosoft.com",
+            "userType": "ServicePrincipal",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            svc_reporting_id,
+            ROLE_BY_NAME["Global Administrator"],
+            assigned_at_days_ago=700,
+        )
+    )
+    rc += 1
+    # Last sign-in was 47 days ago — within 30-day dormancy window but only
+    # just; the overprivileged signal comes from role tier vs account type.
+    for day, app in [
+        (47, "Microsoft Graph"),
+        (62, "Microsoft Graph"),
+        (75, "Microsoft Graph"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", svc_reporting_id, "svc-reporting", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # DORMANT PRIVILEGED ACCOUNTS
+    # -----------------------------------------------------------------------
+    # DP-1: Trevor Blanchard — Global Admin, last sign-in 65 days ago
+    # Clear dormancy: Tier 0 role, 65-day gap exceeds the 30-day threshold.
+    # -----------------------------------------------------------------------
+    trevor_id = "dp-user-0001-trevor-blanchard-000000001"
+    users.append(
+        {
+            "id": trevor_id,
+            "displayName": "Trevor Blanchard",
+            "userPrincipalName": "trevor.blanchard@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            trevor_id,
+            ROLE_BY_NAME["Global Administrator"],
+            assigned_at_days_ago=730,
+        )
+    )
+    rc += 1
+    # Deliberately sparse sign-ins — all older than 30 days.
+    for day, app in [
+        (65, "Microsoft Azure Management"),
+        (72, "Microsoft Teams"),
+        (80, "Microsoft Azure Management"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", trevor_id, "Trevor Blanchard", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # DP-2: Priya Subramaniam — Privileged Role Administrator, 55 days dormant
+    # Clear dormancy: Tier 0, no sign-in for 55 days.
+    # -----------------------------------------------------------------------
+    priya_id = "dp-user-0002-priya-subramaniam-0000000002"
+    users.append(
+        {
+            "id": priya_id,
+            "displayName": "Priya Subramaniam",
+            "userPrincipalName": "priya.subramaniam@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            priya_id,
+            ROLE_BY_NAME["Privileged Role Administrator"],
+            assigned_at_days_ago=620,
+        )
+    )
+    rc += 1
+    for day, app in [
+        (55, "Azure Active Directory PowerShell"),
+        (61, "Microsoft Azure Management"),
+        (68, "Azure Active Directory PowerShell"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", priya_id, "Priya Subramaniam", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # DP-3: svc-legacy-sync — ServicePrincipal, User Administrator, 90d silent
+    # No sign-in entries at all within the observation window.  Standing
+    # Tier 1 privilege on a service account that has been silent for the
+    # entire 90-day window.
+    # -----------------------------------------------------------------------
+    svc_legacy_id = "dp-user-0003-svc-legacy-sync-000000000003"
+    users.append(
+        {
+            "id": svc_legacy_id,
+            "displayName": "svc-legacy-sync",
+            "userPrincipalName": "svc-legacy-sync@contoso.onmicrosoft.com",
+            "userType": "ServicePrincipal",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            svc_legacy_id,
+            ROLE_BY_NAME["User Administrator"],
+            assigned_at_days_ago=900,
+        )
+    )
+    rc += 1
+    # Intentionally zero sign-in entries for this account.
+
+    # -----------------------------------------------------------------------
+    # DP-4: Chen Wei — Exchange Admin + Security Admin, 40 days dormant
+    # Tier 1 roles on an account that has been idle for 40 days.
+    # -----------------------------------------------------------------------
+    chen_id = "dp-user-0004-chen-wei-00000000000000000004"
+    users.append(
+        {
+            "id": chen_id,
+            "displayName": "Chen Wei",
+            "userPrincipalName": "chen.wei@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    for role_name, age in [
+        ("Exchange Administrator", 500),
+        ("Security Administrator", 380),
+    ]:
+        role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                chen_id,
+                ROLE_BY_NAME[role_name],
+                assigned_at_days_ago=age,
+            )
+        )
+        rc += 1
+    for day, app in [
+        (40, "Office 365 Exchange Online"),
+        (45, "Microsoft Azure Management"),
+        (52, "Office 365 Exchange Online"),
+    ]:
+        sign_in_logs.append(
+            _make_sign_in(f"sl-{sc:06d}", chen_id, "Chen Wei", day, app)
+        )
+        sc += 1
+
+    # -----------------------------------------------------------------------
+    # CORRECTLY PROVISIONED ACCOUNTS (must NOT be flagged)
+    # -----------------------------------------------------------------------
+    # CP-1: Alice Johnson — Global Admin with regular Azure management activity
+    # Appropriate: frequent, recent sign-ins to Azure management tooling
+    # demonstrate active use of the role.
+    # -----------------------------------------------------------------------
+    alice_id = "cp-user-0001-alice-johnson-00000000000001"
+    users.append(
+        {
+            "id": alice_id,
+            "displayName": "Alice Johnson",
+            "userPrincipalName": "alice.johnson@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            alice_id,
+            ROLE_BY_NAME["Global Administrator"],
+            assigned_at_days_ago=900,
+        )
+    )
+    rc += 1
+    logs, sc = _workday_sign_ins(
+        alice_id, "Alice Johnson", sc, (1, 30), ADMIN_APPS, count=10
+    )
+    sign_in_logs.extend(logs)
+
+    # -----------------------------------------------------------------------
+    # CP-2: Bob Martinez — Security Reader, recent activity
+    # Appropriate: low-tier role, active user, no overprivilege concern.
+    # -----------------------------------------------------------------------
+    bob_id = "cp-user-0002-bob-martinez-000000000000002"
+    users.append(
+        {
+            "id": bob_id,
+            "displayName": "Bob Martinez",
+            "userPrincipalName": "bob.martinez@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            bob_id,
+            ROLE_BY_NAME["Security Reader"],
+            assigned_at_days_ago=200,
+        )
+    )
+    rc += 1
+    logs, sc = _workday_sign_ins(
+        bob_id, "Bob Martinez", sc, (1, 20), NON_ADMIN_APPS, count=8
+    )
+    sign_in_logs.extend(logs)
+
+    # -----------------------------------------------------------------------
+    # CP-3: Carol Nguyen — User Administrator with regular sign-ins
+    # Appropriate: single Tier 1 role, active and recent usage.
+    # -----------------------------------------------------------------------
+    carol_id = "cp-user-0003-carol-nguyen-000000000000003"
+    users.append(
+        {
+            "id": carol_id,
+            "displayName": "Carol Nguyen",
+            "userPrincipalName": "carol.nguyen@contoso.onmicrosoft.com",
+            "userType": "Member",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            carol_id,
+            ROLE_BY_NAME["User Administrator"],
+            assigned_at_days_ago=300,
+        )
+    )
+    rc += 1
+    logs, sc = _workday_sign_ins(
+        carol_id,
+        "Carol Nguyen",
+        sc,
+        (1, 25),
+        NON_ADMIN_APPS + ["Azure Active Directory PowerShell"],
+        count=10,
+    )
+    sign_in_logs.extend(logs)
+
+    # -----------------------------------------------------------------------
+    # CP-4: svc-monitoring — ServicePrincipal with Security Reader only
+    # Appropriate: read-only role, service account, regular Graph API access.
+    # -----------------------------------------------------------------------
+    svc_monitoring_id = "cp-user-0004-svc-monitoring-000000000004"
+    users.append(
+        {
+            "id": svc_monitoring_id,
+            "displayName": "svc-monitoring",
+            "userPrincipalName": "svc-monitoring@contoso.onmicrosoft.com",
+            "userType": "ServicePrincipal",
+            "accountEnabled": True,
+        }
+    )
+    role_assignments.append(
+        _make_ra(
+            f"ra-{rc:06d}",
+            svc_monitoring_id,
+            ROLE_BY_NAME["Security Reader"],
+            assigned_at_days_ago=450,
+        )
+    )
+    rc += 1
+    # Service accounts sign in via Graph API consistently.
+    for day in range(1, 30, 3):
+        sign_in_logs.append(
+            _make_sign_in(
+                f"sl-{sc:06d}",
+                svc_monitoring_id,
+                "svc-monitoring",
+                day,
+                "Microsoft Graph",
+            )
+        )
+        sc += 1
+
+    return users, role_assignments, sign_in_logs, sc, rc
+
+
+# ---------------------------------------------------------------------------
+# Groups with inherited role assignments
+# ---------------------------------------------------------------------------
+
+
+def _build_groups(
+    all_user_ids: list[str],
+    ground_truth_user_ids: set[str],
+    ra_counter: int,
+) -> tuple[list[dict], list[dict], int]:
+    """Create groups, assign roles to them, and build group-inherited RAs.
+
+    Returns the groups list, additional role_assignments for group-inherited
+    memberships, and the updated ra_counter.
+    """
+    groups: list[dict] = []
+    extra_role_assignments: list[dict] = []
+    rc = ra_counter
+
+    # Only pick bulk users (non-ground-truth) for group membership to keep
+    # the ground-truth accounts cleanly associated with their direct
+    # assignments and avoid test interference.
+    bulk_ids = [uid for uid in all_user_ids if uid not in ground_truth_user_ids]
+
+    if len(bulk_ids) < 6:
+        return groups, extra_role_assignments, rc
+
+    # ------------------------------------------------------------------
+    # Group 1: Tier0-Admins-PIM — role-assignable, Privileged Role Admin
+    # Members inherit Privileged Role Administrator via group.
+    # ------------------------------------------------------------------
+    tier0_members = random.sample(bulk_ids, min(3, len(bulk_ids)))
+    tier0_group_id = "grp-0001-tier0-admins-pim-00000000000001"
+    groups.append(
+        {
+            "id": tier0_group_id,
             "displayName": "Tier0-Admins (PIM)",
             "isRoleAssignable": True,
             "members": tier0_members,
-            "assignedRoles": [ROLE_BY_NAME["Privileged Role Administrator"][0]],
-        },
+            "assignedRoles": [ROLE_BY_NAME["Privileged Role Administrator"]["id"]],
+        }
+    )
+    for member_id in tier0_members:
+        extra_role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                member_id,
+                ROLE_BY_NAME["Privileged Role Administrator"],
+                assignment_type="group",
+                assigned_via="Tier0-Admins (PIM)",
+                assigned_at_days_ago=random.randint(200, 800),
+            )
+        )
+        rc += 1
+
+    # ------------------------------------------------------------------
+    # Group 2: Security Operations — role-assignable, Security Administrator
+    # ------------------------------------------------------------------
+    remaining = [uid for uid in bulk_ids if uid not in tier0_members]
+    secops_members = random.sample(remaining, min(4, len(remaining)))
+    secops_group_id = "grp-0002-security-operations-000000000002"
+    groups.append(
         {
-            "id": TIER1_GROUP_ID,
+            "id": secops_group_id,
             "displayName": "Security Operations",
             "isRoleAssignable": True,
-            "members": tier1_members,
-            "assignedRoles": [ROLE_BY_NAME["Security Administrator"][0]],
-        },
-        {
-            "id": HELPDESK_GROUP_ID,
-            "displayName": "IT Helpdesk",
-            "isRoleAssignable": False,
-            "members": helpdesk_members,
-            "assignedRoles": [],
-        },
-        {
-            "id": READERS_GROUP_ID,
-            "displayName": "Audit Readers",
-            "isRoleAssignable": False,
-            "members": readers_members,
-            "assignedRoles": [],
-        },
-        {
-            "id": COMPLIANCE_GROUP_ID,
-            "displayName": "Compliance Team",
-            "isRoleAssignable": True,
-            "members": compliance_members,
-            "assignedRoles": [ROLE_BY_NAME["Compliance Administrator"][0]],
-        },
-    ]
-
-    # Build group-display-name lookup by id for role-assignment generation
-    group_name_by_id = {g["id"]: g["displayName"] for g in groups}
-
-    # ---------------------------------------------------------------
-    # 3. Role assignments
-    # ---------------------------------------------------------------
-    role_assignments: list[dict[str, Any]] = []
-    ra_counter = 0
-
-    def _ra(
-        principal_id: str,
-        role_name: str,
-        assignment_type: str = "direct",
-        assigned_via: str | None = None,
-        assigned_at: datetime | None = None,
-    ) -> dict[str, Any]:
-        nonlocal ra_counter
-        ra_counter += 1
-        rid, _ = ROLE_BY_NAME[role_name]
-        if assigned_at is None:
-            # Realistic: assignments made 1–24 months before snapshot
-            days_ago = rng.randint(30, 730)
-            assigned_at = snapshot_date - timedelta(days=days_ago)
-        return {
-            "id": f"ra-{ra_counter:05d}",
-            "principalId": principal_id,
-            "roleDefinitionId": rid,
-            "roleName": role_name,
-            "assignmentType": assignment_type,
-            "assignedVia": assigned_via,
-            "assignedAt": _ts(assigned_at),
+            "members": secops_members,
+            "assignedRoles": [ROLE_BY_NAME["Security Administrator"]["id"]],
         }
-
-    # -- Overprivileged accounts: high-tier roles, mundane activity profile --
-    # OP1: Global Administrator (direct) — only does Teams/Office work
-    role_assignments.append(_ra(OP1_ID, "Global Administrator"))
-    role_assignments.append(_ra(OP1_ID, "Reports Reader"))
-
-    # OP2: Privileged Role Administrator + User Administrator (direct)
-    role_assignments.append(_ra(OP2_ID, "Privileged Role Administrator"))
-    role_assignments.append(_ra(OP2_ID, "User Administrator"))
-
-    # OP3: Security Administrator + Exchange Administrator — only basic logins
-    role_assignments.append(_ra(OP3_ID, "Security Administrator"))
-    role_assignments.append(_ra(OP3_ID, "Exchange Administrator"))
-
-    # OP4: Global Administrator (direct) — guest account, basic sign-ins only
-    role_assignments.append(_ra(OP4_ID, "Global Administrator"))
-
-    # -- Dormant privileged accounts: no sign-in within 45+ days --
-    # DP1: Global Administrator (direct), last signed in ~60 days ago
-    role_assignments.append(_ra(DP1_ID, "Global Administrator"))
-
-    # DP2: Privileged Role Administrator (group-inherited via Tier0-Admins)
-    role_assignments.append(
-        _ra(
-            DP2_ID,
-            "Privileged Role Administrator",
-            assignment_type="group",
-            assigned_via="Tier0-Admins (PIM)",
-        )
     )
-
-    # DP3: Application Administrator (service principal) — no sign-in ever
-    role_assignments.append(_ra(DP3_ID, "Application Administrator"))
-
-    # DP4: Cloud Application Administrator (service principal) — no sign-in ever
-    role_assignments.append(_ra(DP4_ID, "Cloud Application Administrator"))
-    role_assignments.append(_ra(DP4_ID, "User Administrator"))
-
-    # -- Correctly provisioned accounts --
-    # CP1: Security Administrator via group — active security analyst
-    role_assignments.append(
-        _ra(
-            CP1_ID,
-            "Security Administrator",
-            assignment_type="group",
-            assigned_via="Security Operations",
-        )
-    )
-
-    # CP2: Security Reader — read-only, appropriate for their role
-    role_assignments.append(_ra(CP2_ID, "Security Reader"))
-
-    # CP3: Compliance Administrator via group — active compliance officer
-    role_assignments.append(
-        _ra(
-            CP3_ID,
-            "Compliance Administrator",
-            assignment_type="group",
-            assigned_via="Compliance Team",
-        )
-    )
-
-    # -- Group-level role assignments (groups hold roles; members inherit them) --
-    # Emit one RA per (member, role) pair for group-inherited assignments not yet covered
-    for group in groups:
-        if not group["assignedRoles"]:
-            continue
-        grp_display = group["displayName"]
-        for member_id in group["members"]:
-            # Skip anchor principals already handled above
-            if member_id in anchor_ids:
-                continue
-            for role_def_id in group["assignedRoles"]:
-                # Find role name from definition ID
-                role_name = next(
-                    (n for n, (rid, _) in ROLE_BY_NAME.items() if rid == role_def_id),
-                    None,
-                )
-                if role_name is None:
-                    continue
-                role_assignments.append(
-                    _ra(
-                        member_id,
-                        role_name,
-                        assignment_type="group",
-                        assigned_via=grp_display,
-                    )
-                )
-
-    # -- Filler direct assignments: most filler users get a low-tier role --
-    low_tier_roles = ["Directory Readers", "Security Reader", "Reports Reader"]
-    for uid in filler_ids:
-        # 70% chance of having a direct low-tier role
-        if rng.random() < 0.70:
-            role_name = rng.choice(low_tier_roles)
-            role_assignments.append(_ra(uid, role_name))
-
-    # A few filler users get a Tier 1 role for realism (correctly provisioned)
-    tier1_roles = [
-        "Helpdesk Administrator",
-        "User Administrator",
-        "Exchange Administrator",
-    ]
-    for uid in rng.sample(filler_ids, 6):
-        role_assignments.append(_ra(uid, rng.choice(tier1_roles)))
-
-    # ---------------------------------------------------------------
-    # 4. Sign-in logs
-    # ---------------------------------------------------------------
-    sign_in_logs: list[dict[str, Any]] = []
-    sl_counter = 0
-
-    def _sl(
-        user_id: str,
-        display_name: str,
-        timestamp: datetime,
-        app: str,
-        status: str = "Success",
-    ) -> dict[str, Any]:
-        nonlocal sl_counter
-        sl_counter += 1
-        return {
-            "id": f"sl-{sl_counter:06d}",
-            "userId": user_id,
-            "userDisplayName": display_name,
-            "signInTimestamp": _ts(timestamp),
-            "appDisplayName": app,
-            "status": status,
-            "ipAddress": _fake_ip(rng),
-        }
-
-    def _add_active_user_logins(
-        uid: str,
-        display_name: str,
-        apps: list[str],
-        count: int = 15,
-        recency_days: int = 20,
-    ) -> None:
-        """Emit *count* sign-in entries spread over the observation window,
-        with the most recent within *recency_days* of the snapshot."""
-        recent_start = snapshot_date - timedelta(days=recency_days)
-        for i in range(count):
-            if i < 3:
-                # Ensure at least three recent logins
-                ts = _random_business_datetime(rng, recent_start, snapshot_date)
-            else:
-                ts = _random_business_datetime(rng, observation_start, snapshot_date)
-            app = rng.choice(apps)
-            sign_in_logs.append(_sl(uid, display_name, ts, app))
-
-    # Overprivileged accounts: active sign-ins, but only mundane apps
-    mundane_apps = ["Microsoft Teams", "Microsoft Office", "Office 365 Exchange Online"]
-
-    _add_active_user_logins(
-        OP1_ID, "Marcus Webb", mundane_apps, count=20, recency_days=5
-    )
-    _add_active_user_logins(
-        OP2_ID, "Priya Nair", mundane_apps, count=18, recency_days=7
-    )
-    _add_active_user_logins(
-        OP3_ID, "Jordan Ellis", mundane_apps, count=15, recency_days=10
-    )
-    _add_active_user_logins(
-        OP4_ID, "Chloe Okonkwo", mundane_apps, count=8, recency_days=14
-    )
-
-    # Dormant accounts: last sign-in 45–90 days before snapshot
-    def _add_stale_logins(
-        uid: str,
-        display_name: str,
-        days_ago_min: int = 45,
-        days_ago_max: int = 85,
-        count: int = 5,
-    ) -> None:
-        stale_end = snapshot_date - timedelta(days=days_ago_min)
-        stale_start = snapshot_date - timedelta(days=days_ago_max)
-        for _ in range(count):
-            ts = _random_business_datetime(rng, stale_start, stale_end)
-            app = rng.choice(APP_NAMES)
-            sign_in_logs.append(_sl(uid, display_name, ts, app))
-
-    _add_stale_logins(DP1_ID, "Ethan Blackwood", days_ago_min=55, days_ago_max=85)
-    _add_stale_logins(DP2_ID, "Sofia Andersen", days_ago_min=45, days_ago_max=80)
-    # DP3 and DP4 are service principals — no sign-in entries at all (never signed in)
-
-    # Correctly provisioned accounts: active, apps consistent with role
-    admin_apps = [
-        "Microsoft Azure Management",
-        "Microsoft 365 Admin Center",
-        "Azure Active Directory PowerShell",
-    ]
-    _add_active_user_logins(CP1_ID, "Amara Osei", admin_apps + mundane_apps, count=20)
-    _add_active_user_logins(CP2_ID, "Henrik Larsson", admin_apps, count=12)
-    _add_active_user_logins(
-        CP3_ID, "Fatima Al-Rashid", admin_apps + mundane_apps, count=18
-    )
-
-    # Filler users: ~80% have sign-in activity, ~20% have zero (natural churn)
-    user_display_map = {u["id"]: u["displayName"] for u in users}
-    for uid in filler_ids:
-        if rng.random() < 0.80:
-            n_logins = rng.randint(1, 25)
-            _add_active_user_logins(
-                uid,
-                user_display_map[uid],
-                mundane_apps,
-                count=n_logins,
-                recency_days=rng.randint(1, 30),
+    for member_id in secops_members:
+        extra_role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                member_id,
+                ROLE_BY_NAME["Security Administrator"],
+                assignment_type="group",
+                assigned_via="Security Operations",
+                assigned_at_days_ago=random.randint(100, 500),
             )
+        )
+        rc += 1
 
-    # ---------------------------------------------------------------
-    # 5. Assemble dataset payload
-    # ---------------------------------------------------------------
-    dataset: dict[str, Any] = {
-        "users": users,
-        "roleAssignments": role_assignments,
-        "signInLogs": sign_in_logs,
-        "groups": groups,
-    }
+    # ------------------------------------------------------------------
+    # Group 3: Helpdesk-L1 — standard security group, Helpdesk Administrator
+    # ------------------------------------------------------------------
+    remaining2 = [uid for uid in remaining if uid not in secops_members]
+    helpdesk_members = random.sample(remaining2, min(5, len(remaining2)))
+    helpdesk_group_id = "grp-0003-helpdesk-l1-0000000000000003"
+    groups.append(
+        {
+            "id": helpdesk_group_id,
+            "displayName": "Helpdesk-L1",
+            "isRoleAssignable": True,
+            "members": helpdesk_members,
+            "assignedRoles": [ROLE_BY_NAME["Helpdesk Administrator"]["id"]],
+        }
+    )
+    for member_id in helpdesk_members:
+        extra_role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                member_id,
+                ROLE_BY_NAME["Helpdesk Administrator"],
+                assignment_type="group",
+                assigned_via="Helpdesk-L1",
+                assigned_at_days_ago=random.randint(60, 400),
+            )
+        )
+        rc += 1
 
-    # ---------------------------------------------------------------
-    # 6. Ground-truth manifest (for integration tests)
-    # ---------------------------------------------------------------
-    ground_truth: list[dict[str, Any]] = [
-        # --- Overprivileged findings ---
+    # ------------------------------------------------------------------
+    # Group 4: All-Staff — plain security group, no privileged roles
+    # All bulk users are members; no role assignments on the group itself.
+    # ------------------------------------------------------------------
+    groups.append(
         {
-            "principalId": OP1_ID,
-            "principalName": "Marcus Webb",
-            "category": "overprivileged",
-            "expectedSeverity": "critical",
-            "reason": (
-                "Global Administrator assigned directly; sign-in activity limited to "
-                "Teams and Office with no Azure Management or admin-portal access."
-            ),
-        },
-        {
-            "principalId": OP2_ID,
-            "principalName": "Priya Nair",
-            "category": "overprivileged",
-            "expectedSeverity": "critical",
-            "reason": (
-                "Holds both Privileged Role Administrator and User Administrator directly; "
-                "sign-in activity limited to mundane productivity apps."
-            ),
-        },
-        {
-            "principalId": OP3_ID,
-            "principalName": "Jordan Ellis",
-            "category": "overprivileged",
-            "expectedSeverity": "high",
-            "reason": (
-                "Security Administrator and Exchange Administrator assigned directly; "
-                "no sign-in activity against security or Exchange workloads."
-            ),
-        },
-        {
-            "principalId": OP4_ID,
-            "principalName": "Chloe Okonkwo",
-            "category": "overprivileged",
-            "expectedSeverity": "critical",
-            "reason": (
-                "Guest account with Global Administrator; "
-                "B2B guests should never hold Tier 0 directory roles."
-            ),
-        },
-        # --- Dormant privileged findings ---
-        {
-            "principalId": DP1_ID,
-            "principalName": "Ethan Blackwood",
-            "category": "dormant_privileged",
-            "expectedSeverity": "critical",
-            "reason": (
-                "Global Administrator with no sign-in for 55–85 days "
-                "(well beyond the 30-day dormancy threshold)."
-            ),
-        },
-        {
-            "principalId": DP2_ID,
-            "principalName": "Sofia Andersen",
-            "category": "dormant_privileged",
-            "expectedSeverity": "critical",
-            "reason": (
-                "Privileged Role Administrator inherited via Tier0-Admins group; "
-                "no sign-in for 45–80 days."
-            ),
-        },
-        {
-            "principalId": DP3_ID,
-            "principalName": "svc-backup-agent",
-            "category": "dormant_privileged",
-            "expectedSeverity": "high",
-            "reason": (
-                "Service principal with Application Administrator and zero sign-in "
-                "activity; standing privilege with no evidence of use."
-            ),
-        },
-        {
-            "principalId": DP4_ID,
-            "principalName": "svc-deploy-prod",
-            "category": "dormant_privileged",
-            "expectedSeverity": "high",
-            "reason": (
-                "Service principal with Cloud Application Administrator and User "
-                "Administrator; no sign-in activity ever recorded."
-            ),
-        },
-    ]
+            "id": "grp-0004-all-staff-0000000000000000004",
+            "displayName": "All Staff",
+            "isRoleAssignable": False,
+            "members": bulk_ids[:],
+            "assignedRoles": [],
+        }
+    )
 
-    return dataset, ground_truth
+    return groups, extra_role_assignments, rc
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point
+# Bulk user generation
+# ---------------------------------------------------------------------------
+
+
+def _build_bulk_users(
+    count: int,
+    sign_in_counter: int,
+    ra_counter: int,
+) -> tuple[list[dict], list[dict], list[dict], int, int]:
+    """Generate *count* generic users with randomised roles and sign-in patterns.
+
+    Approximately 10 % of bulk users have zero sign-in activity to ensure
+    the population includes borderline dormancy cases for low-privilege roles
+    (which should generally NOT trigger findings).
+    """
+    users: list[dict] = []
+    role_assignments: list[dict] = []
+    sign_in_logs: list[dict] = []
+    sc = sign_in_counter
+    rc = ra_counter
+
+    departments = [
+        "Engineering",
+        "Finance",
+        "HR",
+        "Legal",
+        "Marketing",
+        "Operations",
+        "Product",
+        "Sales",
+        "Support",
+        "IT",
+    ]
+
+    for i in range(count):
+        uid = _uid()
+        first = fake.first_name()
+        last = fake.last_name()
+        display_name = f"{first} {last}"
+        dept = random.choice(departments)
+        upn = f"{first.lower()}.{last.lower()}@contoso.onmicrosoft.com"
+
+        user_type: str
+        if i % 20 == 0:
+            user_type = "ServicePrincipal"
+            display_name = f"svc-{dept.lower()}-{fake.word()}"
+            upn = f"{display_name}@contoso.onmicrosoft.com"
+        elif i % 15 == 0:
+            user_type = "Guest"
+            upn = f"{first.lower()}.{last.lower()}_external@partner.com#EXT#@contoso.onmicrosoft.com"
+        else:
+            user_type = "Member"
+
+        users.append(
+            {
+                "id": uid,
+                "displayName": display_name,
+                "userPrincipalName": upn,
+                "userType": user_type,
+                "accountEnabled": True,
+            }
+        )
+
+        # Assign a single role from the bulk pool.
+        role = random.choices(BULK_ROLE_POOL, weights=BULK_ROLE_WEIGHTS, k=1)[0]
+        assignment_age = random.randint(30, 700)
+        role_assignments.append(
+            _make_ra(
+                f"ra-{rc:06d}",
+                uid,
+                role,
+                assigned_at_days_ago=assignment_age,
+            )
+        )
+        rc += 1
+
+        # ~10 % of bulk users have no sign-in logs.
+        if random.random() < 0.10:
+            continue
+
+        # Random sign-in distribution across the 90-day window.
+        sign_in_count = random.randint(3, 20)
+        app_pool = (
+            NON_ADMIN_APPS if user_type != "ServicePrincipal" else ["Microsoft Graph"]
+        )
+        logs, sc = _workday_sign_ins(
+            uid,
+            display_name,
+            sc,
+            (1, OBSERVATION_WINDOW_DAYS - 1),
+            app_pool,
+            count=sign_in_count,
+        )
+        sign_in_logs.extend(logs)
+
+    return users, role_assignments, sign_in_logs, sc, rc
+
+
+# ---------------------------------------------------------------------------
+# Ground-truth manifest
+# ---------------------------------------------------------------------------
+
+
+def _build_ground_truth_manifest() -> dict:
+    """Return the expected audit findings keyed by principal display name.
+
+    This manifest is embedded in the output JSON under ``_groundTruthManifest``
+    so that integration tests can load it alongside the dataset and assert
+    specific findings without hard-coding principal IDs in test source code.
+    """
+    return {
+        "description": (
+            "Expected audit findings for the synthetic dataset. "
+            "Integration tests MUST assert that at minimum these principals "
+            "appear in the audit output with the listed category and severity."
+        ),
+        "expectedFindings": [
+            # Overprivileged
+            {
+                "displayName": "Marcus Webb",
+                "category": "overprivileged",
+                "minSeverity": "high",
+                "reason": "Global Administrator with zero Azure management sign-in activity",
+            },
+            {
+                "displayName": "Diana Okafor",
+                "category": "overprivileged",
+                "minSeverity": "high",
+                "reason": "Privileged Role Administrator with consumer-app-only sign-in pattern",
+            },
+            {
+                "displayName": "Ryan Kowalski",
+                "category": "overprivileged",
+                "minSeverity": "high",
+                "reason": "Three privileged roles (Helpdesk Admin + Security Admin + User Admin) on a single account",
+            },
+            {
+                "displayName": "svc-reporting",
+                "category": "overprivileged",
+                "minSeverity": "high",
+                "reason": "ServicePrincipal holding Global Administrator with infrequent Graph API sign-ins",
+            },
+            # Dormant privileged
+            {
+                "displayName": "Trevor Blanchard",
+                "category": "dormant_privileged",
+                "minSeverity": "critical",
+                "reason": "Global Administrator, last sign-in 65 days ago (exceeds 30-day threshold)",
+            },
+            {
+                "displayName": "Priya Subramaniam",
+                "category": "dormant_privileged",
+                "minSeverity": "critical",
+                "reason": "Privileged Role Administrator, last sign-in 55 days ago",
+            },
+            {
+                "displayName": "svc-legacy-sync",
+                "category": "dormant_privileged",
+                "minSeverity": "high",
+                "reason": "ServicePrincipal with User Administrator, zero sign-in activity in observation window",
+            },
+            {
+                "displayName": "Chen Wei",
+                "category": "dormant_privileged",
+                "minSeverity": "high",
+                "reason": "Exchange Administrator + Security Administrator, last sign-in 40 days ago",
+            },
+        ],
+        "shouldNotBeFlaged": [
+            {
+                "displayName": "Alice Johnson",
+                "reason": "Global Admin with frequent, recent Azure management sign-ins",
+            },
+            {
+                "displayName": "Bob Martinez",
+                "reason": "Security Reader (Tier 2), active user, no overprivilege concern",
+            },
+            {
+                "displayName": "Carol Nguyen",
+                "reason": "User Administrator with regular recent activity",
+            },
+            {
+                "displayName": "svc-monitoring",
+                "reason": "ServicePrincipal with Security Reader only, consistent Graph API access",
+            },
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Top-level assembly
+# ---------------------------------------------------------------------------
+
+
+def generate_dataset(bulk_user_count: int = 88) -> dict:
+    """Assemble and return the complete synthetic dataset.
+
+    Parameters
+    ----------
+    bulk_user_count:
+        Number of randomly generated users to add in addition to the
+        hard-coded ground-truth personas (12 total personas = 4 OP + 4 DP
+        + 4 CP).  Default produces approximately 100 users total.
+
+    Returns
+    -------
+    dict
+        A dataset conforming to ``AzureADDatasetPayload`` plus a
+        ``_groundTruthManifest`` key with expected audit findings.
+    """
+    # Re-seed on every call so that multiple calls within the same process
+    # produce identical output.
+    random.seed(SEED)
+    Faker.seed(SEED)
+
+    sign_in_counter = 1
+    ra_counter = 1
+
+    # Step 1: build ground-truth personas.
+    (
+        gt_users,
+        gt_role_assignments,
+        gt_sign_ins,
+        sign_in_counter,
+        ra_counter,
+    ) = _build_ground_truth_accounts(sign_in_counter, ra_counter)
+
+    # Step 2: build bulk random users.
+    (
+        bulk_users,
+        bulk_role_assignments,
+        bulk_sign_ins,
+        sign_in_counter,
+        ra_counter,
+    ) = _build_bulk_users(bulk_user_count, sign_in_counter, ra_counter)
+
+    all_users = gt_users + bulk_users
+    all_user_ids = [u["id"] for u in all_users]
+    gt_user_ids = {u["id"] for u in gt_users}
+
+    # Step 3: build groups with group-inherited role assignments.
+    groups, group_role_assignments, ra_counter = _build_groups(
+        all_user_ids, gt_user_ids, ra_counter
+    )
+
+    all_role_assignments = (
+        gt_role_assignments + bulk_role_assignments + group_role_assignments
+    )
+    all_sign_ins = gt_sign_ins + bulk_sign_ins
+
+    return {
+        "users": all_users,
+        "roleAssignments": all_role_assignments,
+        "signInLogs": all_sign_ins,
+        "groups": groups,
+        "_groundTruthManifest": _build_ground_truth_manifest(),
+        "_meta": {
+            "generatedAt": _ts(SNAPSHOT_DATE),
+            "snapshotDate": _ts(SNAPSHOT_DATE),
+            "observationWindowDays": OBSERVATION_WINDOW_DAYS,
+            "seed": SEED,
+            "totalUsers": len(all_users),
+            "totalRoleAssignments": len(all_role_assignments),
+            "totalSignInLogs": len(all_sign_ins),
+            "totalGroups": len(groups),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint
 # ---------------------------------------------------------------------------
 
 
 def main() -> None:
+    """CLI entry point — generate the dataset and write it to disk."""
     parser = argparse.ArgumentParser(
-        description="Generate a deterministic synthetic Azure AD tenant snapshot."
+        description="Generate a deterministic synthetic Azure AD role-assignment dataset."
     )
     parser.add_argument(
         "--output",
-        default="data/sample_dataset.json",
-        help="Path for the dataset JSON output file (default: data/sample_dataset.json).",
+        default=str(Path(__file__).parent / "sample_dataset.json"),
+        help="Path to write the output JSON (default: scripts/sample_dataset.json).",
     )
     parser.add_argument(
-        "--ground-truth",
-        default="data/ground_truth.json",
-        help="Path for the ground-truth findings manifest (default: data/ground_truth.json).",
-    )
-    parser.add_argument(
-        "--seed",
+        "--bulk-users",
         type=int,
-        default=42,
-        help="RNG seed for deterministic output (default: 42).",
+        default=88,
+        help="Number of randomly generated users in addition to the 12 ground-truth personas.",
     )
     parser.add_argument(
         "--pretty",
         action="store_true",
         default=True,
-        help="Pretty-print JSON output (default: true).",
+        help="Write indented JSON (default: True).",
     )
     args = parser.parse_args()
 
-    dataset, ground_truth = generate(seed=args.seed)
+    print(
+        f"Generating synthetic dataset (seed={SEED}, bulk_users={args.bulk_users}) ...",
+        file=sys.stderr,
+    )
 
-    indent = 2 if args.pretty else None
+    dataset = generate_dataset(bulk_user_count=args.bulk_users)
 
-    # Ensure output directories exist
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    gt_path = Path(args.ground_truth)
-    gt_path.parent.mkdir(parents=True, exist_ok=True)
-
+    indent = 2 if args.pretty else None
     with output_path.open("w", encoding="utf-8") as fh:
         json.dump(dataset, fh, indent=indent, ensure_ascii=False)
 
-    with gt_path.open("w", encoding="utf-8") as fh:
-        json.dump(ground_truth, fh, indent=indent, ensure_ascii=False)
-
-    # Summary stats
-    n_users = len(dataset["users"])
-    n_roles = len({ra["roleDefinitionId"] for ra in dataset["roleAssignments"]})
-    n_assignments = len(dataset["roleAssignments"])
-    n_sign_ins = len(dataset["signInLogs"])
-    n_groups = len(dataset["groups"])
-
-    print(f"Dataset written to   : {output_path}")
-    print(f"Ground truth written : {gt_path}")
-    print(f"  Users              : {n_users}")
-    print(f"  Distinct roles     : {n_roles}")
-    print(f"  Role assignments   : {n_assignments}")
-    print(f"  Sign-in log entries: {n_sign_ins}")
-    print(f"  Groups             : {n_groups}")
-    print(f"  Ground-truth flags : {len(ground_truth)}")
+    meta = dataset["_meta"]
+    print(
+        f"Dataset written to {output_path}\n"
+        f"  Users:            {meta['totalUsers']}\n"
+        f"  Role assignments: {meta['totalRoleAssignments']}\n"
+        f"  Sign-in logs:     {meta['totalSignInLogs']}\n"
+        f"  Groups:           {meta['totalGroups']}",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
