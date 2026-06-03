@@ -145,7 +145,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S", "B"]
-"scripts/*" = ["S", "E501"]  # long strings acceptable in data-gen
+"scripts/*" = ["S", "E501", "F841"]  # data-gen scripts: unused vars acceptable
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "scripts"]
