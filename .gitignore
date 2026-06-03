@@ -51,8 +51,6 @@ Thumbs.db
 # Docker volumes
 postgres_data/
 
-# Generated data
-data/
 *.json.bak
 
 # Alembic — keep migrations, ignore auto-generated temp files

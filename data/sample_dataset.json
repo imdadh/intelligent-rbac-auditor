@@ -1,0 +1,570 @@
+{
+  "users": [
+    {
+      "id": "op-user-0001-marcus-webb-000000000001",
+      "displayName": "Marcus Webb",
+      "userPrincipalName": "marcus.webb@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "op-user-0002-diana-okafor-000000000002",
+      "displayName": "Diana Okafor",
+      "userPrincipalName": "diana.okafor@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "op-user-0003-ryan-kowalski-000000000003",
+      "displayName": "Ryan Kowalski",
+      "userPrincipalName": "ryan.kowalski@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "op-user-0004-svc-reporting-0000000000004",
+      "displayName": "svc-reporting",
+      "userPrincipalName": "svc-reporting@contoso.onmicrosoft.com",
+      "userType": "ServicePrincipal",
+      "accountEnabled": true
+    },
+    {
+      "id": "dp-user-0001-trevor-blanchard-000000001",
+      "displayName": "Trevor Blanchard",
+      "userPrincipalName": "trevor.blanchard@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "dp-user-0002-priya-subramaniam-0000000002",
+      "displayName": "Priya Subramaniam",
+      "userPrincipalName": "priya.subramaniam@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "dp-user-0003-svc-legacy-sync-000000000003",
+      "displayName": "svc-legacy-sync",
+      "userPrincipalName": "svc-legacy-sync@contoso.onmicrosoft.com",
+      "userType": "ServicePrincipal",
+      "accountEnabled": true
+    },
+    {
+      "id": "dp-user-0004-chen-wei-00000000000000000004",
+      "displayName": "Chen Wei",
+      "userPrincipalName": "chen.wei@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "cp-user-0001-alice-johnson-00000000000001",
+      "displayName": "Alice Johnson",
+      "userPrincipalName": "alice.johnson@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "cp-user-0002-bob-martinez-000000000000002",
+      "displayName": "Bob Martinez",
+      "userPrincipalName": "bob.martinez@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "cp-user-0003-carol-nguyen-000000000000003",
+      "displayName": "Carol Nguyen",
+      "userPrincipalName": "carol.nguyen@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "cp-user-0004-svc-monitoring-000000000004",
+      "displayName": "svc-monitoring",
+      "userPrincipalName": "svc-monitoring@contoso.onmicrosoft.com",
+      "userType": "ServicePrincipal",
+      "accountEnabled": true
+    },
+    {
+      "id": "bulk-00000000-0000-0000-0000-000000000001",
+      "displayName": "James Smith",
+      "userPrincipalName": "james.smith@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "bulk-00000000-0000-0000-0000-000000000002",
+      "displayName": "Mary Johnson",
+      "userPrincipalName": "mary.johnson@contoso.onmicrosoft.com",
+      "userType": "Member",
+      "accountEnabled": true
+    },
+    {
+      "id": "bulk-00000000-0000-0000-0000-000000000003",
+      "displayName": "svc-engineering-helper",
+      "userPrincipalName": "svc-engineering-helper@contoso.onmicrosoft.com",
+      "userType": "ServicePrincipal",
+      "accountEnabled": true
+    }
+  ],
+  "roleAssignments": [
+    {
+      "id": "ra-000001",
+      "principalId": "op-user-0001-marcus-webb-000000000001",
+      "roleDefinitionId": "62e90394-69f5-4237-9190-012177145e10",
+      "roleName": "Global Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-06-13T12:00:00Z"
+    },
+    {
+      "id": "ra-000002",
+      "principalId": "op-user-0002-diana-okafor-000000000002",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b1",
+      "roleName": "Privileged Role Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-07-22T10:00:00Z"
+    },
+    {
+      "id": "ra-000003",
+      "principalId": "op-user-0003-ryan-kowalski-000000000003",
+      "roleDefinitionId": "729827e3-9c14-49f7-bb1b-9608f156bbb8",
+      "roleName": "Helpdesk Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2022-12-01T08:00:00Z"
+    },
+    {
+      "id": "ra-000004",
+      "principalId": "op-user-0003-ryan-kowalski-000000000003",
+      "roleDefinitionId": "194ae4cb-b126-40b2-bd5b-6091b380977d",
+      "roleName": "Security Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-08-10T14:30:00Z"
+    },
+    {
+      "id": "ra-000005",
+      "principalId": "op-user-0003-ryan-kowalski-000000000003",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b2",
+      "roleName": "User Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-05-01T09:00:00Z"
+    },
+    {
+      "id": "ra-000006",
+      "principalId": "op-user-0004-svc-reporting-0000000000004",
+      "roleDefinitionId": "62e90394-69f5-4237-9190-012177145e10",
+      "roleName": "Global Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2022-03-15T16:00:00Z"
+    },
+    {
+      "id": "ra-000007",
+      "principalId": "dp-user-0001-trevor-blanchard-000000001",
+      "roleDefinitionId": "62e90394-69f5-4237-9190-012177145e10",
+      "roleName": "Global Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2022-11-01T12:00:00Z"
+    },
+    {
+      "id": "ra-000008",
+      "principalId": "dp-user-0002-priya-subramaniam-0000000002",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b1",
+      "roleName": "Privileged Role Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-03-05T10:00:00Z"
+    },
+    {
+      "id": "ra-000009",
+      "principalId": "dp-user-0003-svc-legacy-sync-000000000003",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b2",
+      "roleName": "User Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2022-01-20T09:00:00Z"
+    },
+    {
+      "id": "ra-000010",
+      "principalId": "dp-user-0004-chen-wei-00000000000000000004",
+      "roleDefinitionId": "29232cdf-9323-42fd-ade2-1d097af3e4de",
+      "roleName": "Exchange Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-06-01T14:00:00Z"
+    },
+    {
+      "id": "ra-000011",
+      "principalId": "dp-user-0004-chen-wei-00000000000000000004",
+      "roleDefinitionId": "194ae4cb-b126-40b2-bd5b-6091b380977d",
+      "roleName": "Security Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-04-10T11:00:00Z"
+    },
+    {
+      "id": "ra-000012",
+      "principalId": "cp-user-0001-alice-johnson-00000000000001",
+      "roleDefinitionId": "62e90394-69f5-4237-9190-012177145e10",
+      "roleName": "Global Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2022-04-20T08:00:00Z"
+    },
+    {
+      "id": "ra-000013",
+      "principalId": "cp-user-0002-bob-martinez-000000000000002",
+      "roleDefinitionId": "5d6b6bb7-de71-4623-b4af-96380a352509",
+      "roleName": "Security Reader",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-02-28T16:30:00Z"
+    },
+    {
+      "id": "ra-000014",
+      "principalId": "cp-user-0003-carol-nguyen-000000000000003",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b2",
+      "roleName": "User Administrator",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-09-15T13:00:00Z"
+    },
+    {
+      "id": "ra-000015",
+      "principalId": "cp-user-0004-svc-monitoring-000000000004",
+      "roleDefinitionId": "5d6b6bb7-de71-4623-b4af-96380a352509",
+      "roleName": "Security Reader",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2023-11-01T10:00:00Z"
+    },
+    {
+      "id": "ra-000016",
+      "principalId": "bulk-00000000-0000-0000-0000-000000000001",
+      "roleDefinitionId": "5d6b6bb7-de71-4623-b4af-96380a352509",
+      "roleName": "Security Reader",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-06-01T07:00:00Z"
+    },
+    {
+      "id": "ra-000017",
+      "principalId": "bulk-00000000-0000-0000-0000-000000000002",
+      "roleDefinitionId": "4a5d8f65-41da-4de4-8968-e035b65339cf",
+      "roleName": "Reports Reader",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-03-22T09:30:00Z"
+    },
+    {
+      "id": "ra-000018",
+      "principalId": "bulk-00000000-0000-0000-0000-000000000003",
+      "roleDefinitionId": "88d8e3e3-8f55-4a1e-953a-9b9898b8876b",
+      "roleName": "Directory Readers",
+      "assignmentType": "direct",
+      "assignedVia": null,
+      "assignedAt": "2024-07-10T15:00:00Z"
+    },
+    {
+      "id": "ra-000019",
+      "principalId": "bulk-00000000-0000-0000-0000-000000000001",
+      "roleDefinitionId": "fe930be7-5e62-47db-91af-98c3a49a38b1",
+      "roleName": "Privileged Role Administrator",
+      "assignmentType": "group",
+      "assignedVia": "Tier0-Admins (PIM)",
+      "assignedAt": "2022-12-01T00:00:00Z"
+    },
+    {
+      "id": "ra-000020",
+      "principalId": "bulk-00000000-0000-0000-0000-000000000002",
+      "roleDefinitionId": "194ae4cb-b126-40b2-bd5b-6091b380977d",
+      "roleName": "Security Administrator",
+      "assignmentType": "group",
+      "assignedVia": "Security Operations",
+      "assignedAt": "2023-05-20T08:00:00Z"
+    }
+  ],
+  "signInLogs": [
+    {
+      "id": "sl-000001",
+      "userId": "op-user-0001-marcus-webb-000000000001",
+      "userDisplayName": "Marcus Webb",
+      "signInTimestamp": "2024-11-12T09:30:00Z",
+      "appDisplayName": "Microsoft Teams",
+      "status": "Success",
+      "ipAddress": "203.0.113.10"
+    },
+    {
+      "id": "sl-000002",
+      "userId": "op-user-0001-marcus-webb-000000000001",
+      "userDisplayName": "Marcus Webb",
+      "signInTimestamp": "2024-11-10T14:15:00Z",
+      "appDisplayName": "Microsoft Office",
+      "status": "Success",
+      "ipAddress": "203.0.113.10"
+    },
+    {
+      "id": "sl-000003",
+      "userId": "op-user-0002-diana-okafor-000000000002",
+      "userDisplayName": "Diana Okafor",
+      "signInTimestamp": "2024-11-13T08:00:00Z",
+      "appDisplayName": "Microsoft Teams",
+      "status": "Success",
+      "ipAddress": "198.51.100.20"
+    },
+    {
+      "id": "sl-000004",
+      "userId": "op-user-0002-diana-okafor-000000000002",
+      "userDisplayName": "Diana Okafor",
+      "signInTimestamp": "2024-11-11T11:45:00Z",
+      "appDisplayName": "Microsoft Office",
+      "status": "Success",
+      "ipAddress": "198.51.100.20"
+    },
+    {
+      "id": "sl-000005",
+      "userId": "op-user-0003-ryan-kowalski-000000000003",
+      "userDisplayName": "Ryan Kowalski",
+      "signInTimestamp": "2024-11-14T10:00:00Z",
+      "appDisplayName": "Microsoft Teams",
+      "status": "Success",
+      "ipAddress": "203.0.113.30"
+    },
+    {
+      "id": "sl-000006",
+      "userId": "op-user-0004-svc-reporting-0000000000004",
+      "userDisplayName": "svc-reporting",
+      "signInTimestamp": "2024-09-29T06:30:00Z",
+      "appDisplayName": "Microsoft Graph",
+      "status": "Success",
+      "ipAddress": "10.0.0.1"
+    },
+    {
+      "id": "sl-000007",
+      "userId": "dp-user-0001-trevor-blanchard-000000001",
+      "userDisplayName": "Trevor Blanchard",
+      "signInTimestamp": "2024-09-11T15:00:00Z",
+      "appDisplayName": "Microsoft Azure Management",
+      "status": "Success",
+      "ipAddress": "203.0.113.40"
+    },
+    {
+      "id": "sl-000008",
+      "userId": "dp-user-0002-priya-subramaniam-0000000002",
+      "userDisplayName": "Priya Subramaniam",
+      "signInTimestamp": "2024-09-21T12:00:00Z",
+      "appDisplayName": "Azure Active Directory PowerShell",
+      "status": "Success",
+      "ipAddress": "203.0.113.50"
+    },
+    {
+      "id": "sl-000009",
+      "userId": "dp-user-0004-chen-wei-00000000000000000004",
+      "userDisplayName": "Chen Wei",
+      "signInTimestamp": "2024-10-06T09:00:00Z",
+      "appDisplayName": "Office 365 Exchange Online",
+      "status": "Success",
+      "ipAddress": "203.0.113.60"
+    },
+    {
+      "id": "sl-000010",
+      "userId": "cp-user-0001-alice-johnson-00000000000001",
+      "userDisplayName": "Alice Johnson",
+      "signInTimestamp": "2024-11-14T08:30:00Z",
+      "appDisplayName": "Microsoft Azure Management",
+      "status": "Success",
+      "ipAddress": "203.0.113.70"
+    },
+    {
+      "id": "sl-000011",
+      "userId": "cp-user-0001-alice-johnson-00000000000001",
+      "userDisplayName": "Alice Johnson",
+      "signInTimestamp": "2024-11-12T10:15:00Z",
+      "appDisplayName": "Microsoft Graph",
+      "status": "Success",
+      "ipAddress": "203.0.113.70"
+    },
+    {
+      "id": "sl-000012",
+      "userId": "cp-user-0002-bob-martinez-000000000000002",
+      "userDisplayName": "Bob Martinez",
+      "signInTimestamp": "2024-11-13T14:00:00Z",
+      "appDisplayName": "Microsoft Teams",
+      "status": "Success",
+      "ipAddress": "203.0.113.80"
+    },
+    {
+      "id": "sl-000013",
+      "userId": "cp-user-0003-carol-nguyen-000000000000003",
+      "userDisplayName": "Carol Nguyen",
+      "signInTimestamp": "2024-11-14T09:45:00Z",
+      "appDisplayName": "Microsoft Azure Management",
+      "status": "Success",
+      "ipAddress": "203.0.113.90"
+    },
+    {
+      "id": "sl-000014",
+      "userId": "cp-user-0004-svc-monitoring-000000000004",
+      "userDisplayName": "svc-monitoring",
+      "signInTimestamp": "2024-11-14T06:00:00Z",
+      "appDisplayName": "Microsoft Graph",
+      "status": "Success",
+      "ipAddress": "10.0.0.2"
+    },
+    {
+      "id": "sl-000015",
+      "userId": "cp-user-0004-svc-monitoring-000000000004",
+      "userDisplayName": "svc-monitoring",
+      "signInTimestamp": "2024-11-11T07:30:00Z",
+      "appDisplayName": "Microsoft Graph",
+      "status": "Success",
+      "ipAddress": "10.0.0.2"
+    },
+    {
+      "id": "sl-000016",
+      "userId": "bulk-00000000-0000-0000-0000-000000000001",
+      "userDisplayName": "James Smith",
+      "signInTimestamp": "2024-11-10T08:15:00Z",
+      "appDisplayName": "Microsoft Office",
+      "status": "Success",
+      "ipAddress": "203.0.113.100"
+    },
+    {
+      "id": "sl-000017",
+      "userId": "bulk-00000000-0000-0000-0000-000000000002",
+      "userDisplayName": "Mary Johnson",
+      "signInTimestamp": "2024-11-12T11:30:00Z",
+      "appDisplayName": "Microsoft Teams",
+      "status": "Success",
+      "ipAddress": "203.0.113.110"
+    },
+    {
+      "id": "sl-000018",
+      "userId": "bulk-00000000-0000-0000-0000-000000000003",
+      "userDisplayName": "svc-engineering-helper",
+      "signInTimestamp": "2024-11-14T04:00:00Z",
+      "appDisplayName": "Microsoft Graph",
+      "status": "Success",
+      "ipAddress": "10.0.0.3"
+    }
+  ],
+  "groups": [
+    {
+      "id": "grp-0001-tier0-admins-pim-00000000000001",
+      "displayName": "Tier0-Admins (PIM)",
+      "isRoleAssignable": true,
+      "members": ["bulk-00000000-0000-0000-0000-000000000001"],
+      "assignedRoles": ["fe930be7-5e62-47db-91af-98c3a49a38b1"]
+    },
+    {
+      "id": "grp-0002-security-operations-000000000002",
+      "displayName": "Security Operations",
+      "isRoleAssignable": true,
+      "members": ["bulk-00000000-0000-0000-0000-000000000002"],
+      "assignedRoles": ["194ae4cb-b126-40b2-bd5b-6091b380977d"]
+    },
+    {
+      "id": "grp-0003-helpdesk-l1-0000000000000003",
+      "displayName": "Helpdesk-L1",
+      "isRoleAssignable": true,
+      "members": ["bulk-00000000-0000-0000-0000-000000000003"],
+      "assignedRoles": ["729827e3-9c14-49f7-bb1b-9608f156bbb8"]
+    },
+    {
+      "id": "grp-0004-all-staff-0000000000000000004",
+      "displayName": "All Staff",
+      "isRoleAssignable": false,
+      "members": [
+        "bulk-00000000-0000-0000-0000-000000000001",
+        "bulk-00000000-0000-0000-0000-000000000002",
+        "bulk-00000000-0000-0000-0000-000000000003"
+      ],
+      "assignedRoles": []
+    }
+  ],
+  "_groundTruthManifest": {
+    "description": "Expected audit findings for the synthetic dataset. Integration tests MUST assert that at minimum these principals appear in the audit output with the listed category and severity.",
+    "expectedFindings": [
+      {
+        "displayName": "Marcus Webb",
+        "category": "overprivileged",
+        "minSeverity": "high",
+        "reason": "Global Administrator with zero Azure management sign-in activity"
+      },
+      {
+        "displayName": "Diana Okafor",
+        "category": "overprivileged",
+        "minSeverity": "high",
+        "reason": "Privileged Role Administrator with consumer-app-only sign-in pattern"
+      },
+      {
+        "displayName": "Ryan Kowalski",
+        "category": "overprivileged",
+        "minSeverity": "high",
+        "reason": "Three privileged roles (Helpdesk Admin + Security Admin + User Admin) on a single account"
+      },
+      {
+        "displayName": "svc-reporting",
+        "category": "overprivileged",
+        "minSeverity": "high",
+        "reason": "ServicePrincipal holding Global Administrator with infrequent Graph API sign-ins"
+      },
+      {
+        "displayName": "Trevor Blanchard",
+        "category": "dormant_privileged",
+        "minSeverity": "critical",
+        "reason": "Global Administrator, last sign-in 65 days ago (exceeds 30-day threshold)"
+      },
+      {
+        "displayName": "Priya Subramaniam",
+        "category": "dormant_privileged",
+        "minSeverity": "critical",
+        "reason": "Privileged Role Administrator, last sign-in 55 days ago"
+      },
+      {
+        "displayName": "svc-legacy-sync",
+        "category": "dormant_privileged",
+        "minSeverity": "high",
+        "reason": "ServicePrincipal with User Administrator, zero sign-in activity in observation window"
+      },
+      {
+        "displayName": "Chen Wei",
+        "category": "dormant_privileged",
+        "minSeverity": "high",
+        "reason": "Exchange Administrator + Security Administrator, last sign-in 40 days ago"
+      }
+    ],
+    "shouldNotBeFlagged": [
+      {
+        "displayName": "Alice Johnson",
+        "reason": "Global Admin with frequent, recent Azure management sign-ins"
+      },
+      {
+        "displayName": "Bob Martinez",
+        "reason": "Security Reader (Tier 2), active user, no overprivilege concern"
+      },
+      {
+        "displayName": "Carol Nguyen",
+        "reason": "User Administrator with regular recent activity"
+      },
+      {
+        "displayName": "svc-monitoring",
+        "reason": "ServicePrincipal with Security Reader only, consistent Graph API access"
+      }
+    ]
+  },
+  "_meta": {
+    "generatedAt": "2024-11-15T12:00:00Z",
+    "snapshotDate": "2024-11-15T12:00:00Z",
+    "observationWindowDays": 90,
+    "seed": 42,
+    "totalUsers": 15,
+    "totalRoleAssignments": 20,
+    "totalSignInLogs": 18,
+    "totalGroups": 4
+  }
+}
