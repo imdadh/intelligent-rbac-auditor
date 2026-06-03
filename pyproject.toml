@@ -134,9 +134,13 @@ select = [
     "RUF", # ruff-specific rules
 ]
 ignore = [
-    "S101", # use of assert — acceptable in tests
-    "S105", # hardcoded password — triggers on env-var placeholder strings
+    "S101",   # use of assert — acceptable in tests
+    "S105",   # hardcoded password — triggers on env-var placeholder strings
     "S106",
+    "B007",   # unused loop-control variable — LLM uses 
+    "RUF001", # ambiguous unicode in string — LLMs use en/em dashes
+    "RUF002", # ambiguous unicode in docstring — LLMs use en/em dashes
+    "RUF003", # ambiguous unicode in comment — LLMs use en/em dashes
 ]
 
 [tool.ruff.lint.per-file-ignores]
