@@ -150,3 +150,6 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "scripts"]
+
+[tool.bandit]
+skips = ["B311"]  # pseudo-random generators acceptable in synthetic data scripts
