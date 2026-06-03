@@ -1,13 +1,17 @@
 """Pydantic schema for individual audit findings (FR-13)."""
+
 from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel
 
 
 class FindingSchema(BaseModel):
     """One finding as returned by the audit pipeline."""
+
     id: uuid.UUID
     audit_id: uuid.UUID
     category: str

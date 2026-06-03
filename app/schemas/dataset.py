@@ -1,8 +1,11 @@
 """Pydantic schemas for dataset ingestion and retrieval."""
+
 from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -26,6 +29,7 @@ class UserEntry(BaseModel):
 
 class DatasetCreate(BaseModel):
     """Payload for POST /api/v1/datasets."""
+
     name: str = Field(min_length=1, max_length=255)
     data: dict[str, Any] = Field(description="Raw Azure AD snapshot JSON.")
 
@@ -39,14 +43,24 @@ class DatasetCreate(BaseModel):
         if not isinstance(users, list):
             raise ValueError("'users' must be an array.")
         for i, user in enumerate(users):
-            missing = [f for f in ("identifier", "displayName", "roleAssignments", "signInActivity")
-                       if f not in user]
+            missing = [
+                f
+                for f in (
+                    "identifier",
+                    "displayName",
+                    "roleAssignments",
+                    "signInActivity",
+                )
+                if f not in user
+            ]
             if missing:
                 raise ValueError(
                     f"User at index {i} is missing required fields: {missing}"
                 )
             for j, ra in enumerate(user.get("roleAssignments", [])):
-                ra_missing = [f for f in ("roleId", "roleName", "assignmentType") if f not in ra]
+                ra_missing = [
+                    f for f in ("roleId", "roleName", "assignmentType") if f not in ra
+                ]
                 if ra_missing:
                     raise ValueError(
                         f"roleAssignment at users[{i}].roleAssignments[{j}] "
@@ -57,6 +71,7 @@ class DatasetCreate(BaseModel):
 
 class DatasetResponse(BaseModel):
     """Response body after successful dataset ingestion."""
+
     id: uuid.UUID
     name: str
     user_count: int | None
