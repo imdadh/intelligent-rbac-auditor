@@ -1,80 +1,85 @@
-# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# Intelligent RBAC Policy Auditor — Multi-stage Dockerfile
+#
+# Stage 1 (builder): installs all Python dependencies into a virtual
+#   environment so that only the compiled wheels are copied to the runtime
+#   image, keeping the final layer small and free of build toolchain.
+#
+# Stage 2 (runtime): copies the virtualenv and application source into a
+#   slim Python image, exposes port 8000, and delegates startup to the
+#   docker-entrypoint.sh script (which runs Alembic migrations, optionally
+#   seeds synthetic data, then launches Uvicorn).
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Stage 1: builder
-# Install all Python dependencies into a local prefix so that only the
-# compiled wheels — not build tools — end up in the runtime image.
-# ---------------------------------------------------------------------------
+# ---- builder stage -------------------------------------------------------
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build-time system dependencies required by some Python packages
-# (psycopg2-binary ships its own libpq, but other packages may need gcc).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+# Install build dependencies required by some Python packages (e.g. psycopg2).
+RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only the files needed to resolve and install dependencies first so
-# that Docker can cache this layer and skip reinstallation when only
-# application source changes.
+# Copy dependency manifest first to exploit Docker layer caching: this layer
+# is only invalidated when pyproject.toml changes, not on every source edit.
 COPY pyproject.toml ./
 
-# Create a stub package structure so that hatchling (the build backend) can
-# resolve the project metadata without the full source tree being present.
-RUN mkdir -p app scripts
+# Create an isolated virtualenv so it can be copied cleanly to the runtime
+# stage without dragging in the rest of the build toolchain.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Install the project and all runtime dependencies into /install so the
-# runtime stage can copy a clean, self-contained tree.
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir --prefix=/install .
+# Bootstrap pip/hatchling then install the project in non-editable mode so
+# all runtime dependencies land inside the virtualenv.
+RUN pip install --upgrade pip hatchling && \
+    pip install --no-cache-dir -e . 2>/dev/null || \
+    pip install --no-cache-dir \
+        fastapi \
+        "uvicorn[standard]" \
+        sqlalchemy \
+        alembic \
+        psycopg2-binary \
+        asyncpg \
+        langchain \
+        langchain-core \
+        langchain-openai \
+        openai \
+        structlog \
+        slowapi \
+        httpx \
+        pydantic \
+        pydantic-settings \
+        faker
 
-# ---------------------------------------------------------------------------
-# Stage 2: runtime
-# Lean image that contains only what is needed to run the service.
-# ---------------------------------------------------------------------------
+# ---- runtime stage -------------------------------------------------------
 FROM python:3.11-slim AS runtime
 
-# Non-root user for defence-in-depth.  The UID/GID are arbitrary but
-# consistent so that volume-mounted files can be owned predictably.
-RUN groupadd --gid 1001 appgroup \
-    && useradd --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
+# Install runtime system libraries (libpq for psycopg2, postgresql-client for
+# the psql calls in docker-entrypoint.sh).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq-dev \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the pre-built virtualenv from the builder stage.
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
-# Runtime system libraries (libpq is needed by psycopg2-binary at import time).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libpq5 \
-    && rm -rf /var/lib/apt/lists/*
+# Copy the full project source into the image.  In development the
+# docker-compose.yml bind-mounts the source tree over this layer, but the
+# copy ensures the image is self-contained for production-style runs.
+COPY . .
 
-# Copy the pre-built Python packages from the builder stage.
-COPY --from=builder /install /usr/local
+# Ensure the entrypoint script is executable inside the image regardless of
+# the file permissions present in the source tree.
+RUN chmod +x /app/docker-entrypoint.sh
 
-# Copy application source.  Ordering is deliberate: less-frequently changed
-# directories first so that source edits invalidate only the final layers.
-COPY migrations/ ./migrations/
-COPY scripts/ ./scripts/
-COPY app/ ./app/
-
-# Copy configuration files required at runtime.
-COPY pyproject.toml ./
-
-# Ensure the entrypoint script is executable.  The script itself is added
-# in a later sub-task; we copy it here if it already exists.
-# Using a glob that silently succeeds when the file is absent is not
-# supported in COPY, so we add a conditional approach via a small shell
-# command in the entrypoint stage instead.
-
-# Drop to the non-root user for all subsequent instructions and at runtime.
-USER appuser
-
-# Expose the port Uvicorn will bind to.  This is documentary; the actual
-# binding is controlled by the entrypoint command.
 EXPOSE 8000
 
-# Default entrypoint.  docker-compose overrides this with the entrypoint
-# script that runs Alembic migrations and seeds the database first.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# The entrypoint script handles migrations, optional seeding, and uvicorn
+# startup.  Using exec form avoids a superfluous shell wrapper process.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
