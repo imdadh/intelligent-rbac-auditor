@@ -21,11 +21,12 @@ Design notes
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.audit import Audit
-from datetime import datetime
+    from app.models.query_log import QueryLog
 
 from sqlalchemy import DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -106,6 +107,14 @@ class Dataset(Base):
     #: All audit runs that reference this dataset.
     audits: Mapped[list[Audit]] = relationship(  # type: ignore[name-defined]
         "Audit",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    #: All natural-language query logs issued against this dataset.
+    query_logs: Mapped[list[QueryLog]] = relationship(  # type: ignore[name-defined]
+        "QueryLog",
         back_populates="dataset",
         cascade="all, delete-orphan",
         lazy="select",
