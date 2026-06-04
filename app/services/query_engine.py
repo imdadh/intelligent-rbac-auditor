@@ -43,7 +43,7 @@ class QueryEngine:
         question: str,
         dataset_name: str,
         dataset_id: str,
-        preprocessed_principals: list[dict],
+        preprocessed_principals: list[dict] | dict,
     ) -> QueryResponse:
         """Answer a natural-language question about the dataset.
 
