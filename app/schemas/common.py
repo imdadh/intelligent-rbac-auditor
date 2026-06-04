@@ -29,3 +29,9 @@ class ErrorResponse(BaseModel):
     """Standard error envelope: {"error": {"code": ..., "message": ...}}."""
 
     error: ErrorDetail
+
+
+class SuccessResponse(BaseModel):
+    """Generic success envelope for mutation endpoints."""
+    message: str = "ok"
+    data: dict | None = None

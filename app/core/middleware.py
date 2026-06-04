@@ -80,3 +80,11 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 
         response.headers[CORRELATION_ID_HEADER] = correlation_id
         return response
+
+
+def setup_middleware(app: object, settings: object) -> None:  # type: ignore[type-arg]
+    """Register application-level middleware.
+
+    Called from the application factory.  Currently a no-op placeholder;
+    CORS, rate-limiting, and other cross-cutting middleware can be added here.
+    """
