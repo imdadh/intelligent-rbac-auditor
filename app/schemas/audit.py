@@ -1,39 +1,45 @@
-"""Pydantic schemas for audit lifecycle."""
-
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.finding import FindingSchema
 
 
 class AuditCreate(BaseModel):
-    """Payload for POST /api/v1/audits."""
+    """Request payload for triggering a new audit."""
 
-    dataset_id: uuid.UUID
+    dataset_id: UUID = Field(..., description="The ID of the dataset to audit.")
 
 
 class AuditStatusResponse(BaseModel):
-    """Polling response from GET /api/v1/audits/{id}."""
+    """Response schema for audit status (without full findings)."""
 
-    id: uuid.UUID
-    dataset_id: uuid.UUID
+    id: UUID
+    dataset_id: UUID
     status: str
-    parameters: dict[str, Any] | None = None
+    parameters: dict[str, Any] = {}
     summary: dict[str, Any] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime
-    error_message: str | None = None
-
-    model_config = {"from_attributes": True}
 
 
-class AuditResultResponse(AuditStatusResponse):
-    """Full audit result including findings."""
+class AuditDetailResponse(BaseModel):
+    """Response schema for a completed audit with full findings."""
 
-    findings: list[FindingSchema] = []
+    id: UUID
+    dataset_id: UUID
+    status: str
+    parameters: dict[str, Any] = {}
+    summary: dict[str, Any] | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_at: datetime
+    findings: list[FindingSchema] = Field(
+        default_factory=list,
+        description="Structured findings produced by the audit (only present when status is 'completed').",
+    )

@@ -11,8 +11,10 @@ from app.core.config import get_settings
 from app.models.audit import Audit
 from app.models.base import get_db
 from app.models.dataset import Dataset
+from app.models.finding import Finding
 from app.schemas.audit import AuditCreate, AuditStatusResponse
 from app.schemas.common import DataResponse, Meta
+from app.schemas.finding import FindingSchema
 from app.services.pipeline import run_audit
 
 logger = logging.getLogger(__name__)
@@ -153,4 +155,56 @@ async def create_audit(
     )
 
 
-# Re-usable dependency for database session
+# ------------------------------------------------------------------
+# GET /api/v1/audits/{audit_id}
+# ------------------------------------------------------------------
+@router.get(
+    "/{audit_id}",
+    response_model=DataResponse,
+    summary="Get audit status and results",
+    description=(
+        "Returns the current state of an audit. If the audit has completed, "
+        "the response includes the full structured findings from the findings table."
+    ),
+)
+def get_audit(
+    audit_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> DataResponse:
+    """Retrieve an audit by its ID, including findings if completed."""
+    audit: Audit | None = db.query(Audit).filter(Audit.id == audit_id).first()
+    if audit is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Audit {audit_id} not found.",
+        )
+
+    findings_data: list[dict] = []
+    if audit.status == "completed":
+        findings_orm = (
+            db.query(Finding)
+            .filter(Finding.audit_id == audit_id)
+            .order_by(Finding.created_at.asc())
+            .all()
+        )
+        findings_data = [
+            FindingSchema.model_validate(f).model_dump(mode="json")
+            for f in findings_orm
+        ]
+
+    data = {
+        "id": str(audit.id),
+        "dataset_id": str(audit.dataset_id),
+        "status": audit.status,
+        "parameters": audit.parameters,
+        "summary": audit.summary,
+        "started_at": audit.started_at.isoformat() if audit.started_at else None,
+        "completed_at": audit.completed_at.isoformat() if audit.completed_at else None,
+        "created_at": audit.created_at.isoformat() if audit.created_at else None,
+        "findings": findings_data,
+    }
+
+    return DataResponse(
+        data=data,
+        meta=Meta(),
+    )
