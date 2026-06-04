@@ -53,7 +53,7 @@ def _run_audit_background(dataset_id: uuid.UUID, dormant_threshold_days: int) ->
         else:
             from app.llm.openai_provider import OpenAIProvider
 
-            provider = OpenAIProvider()
+            provider = OpenAIProvider()  # type: ignore[assignment]
 
         run_audit(
             dataset_id=dataset_id,
