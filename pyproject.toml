@@ -144,7 +144,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "B", "RUF012"]  # mutable class attrs in test classes
+"tests/*" = ["S", "B", "RUF012"]
+"app/api/*" = ["B008", "B904"]  # FastAPI Depends() pattern + re-raise style
 "scripts/*" = ["S", "E501", "F841", "RUF"]  # data-gen scripts: all RUF rules suppressed
 "migrations/*" = ["E501"]  # auto-generated migration files
 
