@@ -35,3 +35,4 @@ class SuccessResponse(BaseModel):
     """Generic success envelope for mutation endpoints."""
     message: str = "ok"
     data: dict | None = None
+    meta: Meta | None = None
