@@ -25,13 +25,19 @@ logger = logging.getLogger(__name__)
 class LLMFindingOutput(BaseModel):
     """Single finding as returned by the LLM, prior to assigning audit IDs."""
 
-    category: str = Field(description="Finding category: overprivileged or dormant_privileged")
+    category: str = Field(
+        description="Finding category: overprivileged or dormant_privileged"
+    )
     severity: str = Field(description="Severity level: critical, high, medium, low")
     principal_id: str = Field(description="Object ID of the affected principal")
     principal_name: str = Field(description="Display name of the affected principal")
     principal_type: str = Field(description="Type: Member, Guest, or ServicePrincipal")
-    role_assignments: list[dict[str, Any]] = Field(description="List of relevant role assignments")
-    evidence: dict[str, Any] = Field(description="Supporting evidence, e.g. days_since_last_sign_in")
+    role_assignments: list[dict[str, Any]] = Field(
+        description="List of relevant role assignments"
+    )
+    evidence: dict[str, Any] = Field(
+        description="Supporting evidence, e.g. days_since_last_sign_in"
+    )
     remediation: str = Field(description="Recommended remediation action")
     narrative: str = Field(description="Plain-language explanation of the risk")
 
@@ -51,7 +57,9 @@ class LLMQueryResponse(BaseModel):
     natural_language_summary: str = Field(
         description="Human-readable summary of the answer"
     )
-    answerable: bool = Field(default=True, description="Whether the question could be answered")
+    answerable: bool = Field(
+        default=True, description="Whether the question could be answered"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -216,10 +224,12 @@ class OpenAIProvider(BaseLLMProvider):
         category_label: str,
     ) -> list[FindingSchema]:
         """Invoke the LLM with the given prompt and parse the output into FindingSchema."""
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "Pre-processed data:\n{data}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "Pre-processed data:\n{data}"),
+            ]
+        )
         chain = prompt | self._llm | self._findings_parser
 
         result: FindingsList = chain.invoke({"data": data_summary})
@@ -255,22 +265,26 @@ class OpenAIProvider(BaseLLMProvider):
 
     def answer_query(self, question: str, context: dict) -> QueryResponse:
         """Answer a natural-language question about a dataset or audit results."""
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", self.QUERY_SYSTEM_PROMPT),
-            (
-                "human",
-                "Context:\n{context}\n\nQuestion:\n{question}",
-            ),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.QUERY_SYSTEM_PROMPT),
+                (
+                    "human",
+                    "Context:\n{context}\n\nQuestion:\n{question}",
+                ),
+            ]
+        )
         chain = prompt | self._llm | self._query_parser
 
         context_str = self._serialise_context(context)
 
         try:
-            result: LLMQueryResponse = chain.invoke({
-                "context": context_str,
-                "question": question,
-            })
+            result: LLMQueryResponse = chain.invoke(
+                {
+                    "context": context_str,
+                    "question": question,
+                }
+            )
         except Exception:
             logger.exception("Query LLM call failed")
             return QueryResponse(
