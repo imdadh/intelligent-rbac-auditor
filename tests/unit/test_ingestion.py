@@ -104,7 +104,7 @@ class TestValidateDatasetData:
 
     def test_missing_users_key_raises_error(self) -> None:
         """Missing top-level 'users' must produce a ``DatasetIngestionError``."""
-        data = {
+        data: dict = {
             "roleAssignments": [],
             "signInLogs": [],
             "groups": [],
@@ -177,7 +177,7 @@ class TestValidateDatasetData:
 
     def test_empty_users_array_passes(self) -> None:
         """An empty ``users`` array is valid (no findings, but schema-valid)."""
-        data = {
+        data: dict = {
             "users": [],
             "roleAssignments": [],
             "signInLogs": [],
@@ -307,7 +307,7 @@ class TestIngestDataset:
 
     def test_invalid_data_raises_and_does_not_add(self, db_session: MagicMock) -> None:
         """If validation fails, the session must not be touched."""
-        invalid_payload = {"roleAssignments": [], "signInLogs": [], "groups": []}
+        invalid_payload: dict = {"roleAssignments": [], "signInLogs": [], "groups": []}
         with pytest.raises(DatasetIngestionError):
             ingest_dataset(name="bad", data=invalid_payload, db=db_session)
         db_session.add.assert_not_called()
