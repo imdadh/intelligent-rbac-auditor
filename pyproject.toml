@@ -144,7 +144,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "B", "RUF012", "F841"]  # test helpers may use assigned-but-unused vars
+"tests/*" = ["S", "B", "RUF012", "F841", "E501"]  # test helpers may use assigned-but-unused vars
 "app/api/*" = ["B008", "B904", "E501"]
 "app/llm/*" = ["E501"]  # LLM prompt strings contain long lines
 "scripts/*" = ["S", "E501", "F841", "RUF"]  # data-gen scripts: all RUF rules suppressed

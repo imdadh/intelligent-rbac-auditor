@@ -103,7 +103,7 @@
   - [x] 5.1 Implement `GET /api/v1/audits/{audit_id}/report?format=markdown` in `app/api/audits.py` that generates a Markdown narrative: executive summary, findings grouped by severity, each finding with 2-4 sentence explanation in plain language. Use LLM to generate narrative if needed, but can also be templated.
   - [x] 5.2 Implement `POST /api/v1/query` in `app/api/query.py`: accept `QueryRequest` with dataset_id and question, call `BaseLLMProvider.answer_query()` with the preprocessed dataset context, return structured answer JSON and natural-language summary. Handle unanswerable questions gracefully.
   - [ ] 5.3 Implement the query engine in `app/services/query_engine.py` that constructs a context string from the dataset (e.g., list of users with roles and last sign-in) and calls the LLM.
-  - [ ] 5.4 Write integration tests for report generation and query interface using the synthetic dataset.
+  - [x] 5.4 Write integration tests for report generation and query interface using the synthetic dataset.
 - [ ] 6.0 Build minimal web UI and serve static assets
   - [ ] 6.1 Create `app/static/index.html` with a single-page layout: header, step indicator (load data, run audit, view findings, ask questions), a main content area, and a chat panel at the bottom.
   - [ ] 6.2 Create `app/static/style.css` with dark theme, severity badge colors (red, orange, yellow, gray), clean typography.
