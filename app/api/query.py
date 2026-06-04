@@ -11,6 +11,7 @@ from app.models.dataset import Dataset
 from app.schemas.common import DataResponse, Meta
 from app.schemas.query import QueryRequest, QueryResponse
 from app.services.preprocessor import preprocess_dataset
+from app.services.query_engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 
@@ -82,22 +83,16 @@ async def query_dataset(
         )
 
     # ------------------------------------------------------------------
-    # 3. Build a context dictionary for the LLM
-    # ------------------------------------------------------------------
-    context = {
-        "dataset_id": str(payload.dataset_id),
-        "dataset_name": dataset.name,
-        "preprocessed_principals": preprocessed,
-    }
-
-    # ------------------------------------------------------------------
-    # 4. Invoke the LLM provider
+    # 3. Build the query engine and answer the question
     # ------------------------------------------------------------------
     try:
         provider = get_llm_provider()
-        query_response: QueryResponse = provider.answer_query(
+        engine = QueryEngine(provider)
+        query_response: QueryResponse = engine.answer(
             question=payload.question,
-            context=context,
+            dataset_name=dataset.name,
+            dataset_id=str(payload.dataset_id),
+            preprocessed_principals=preprocessed,
         )
     except Exception as exc:
         logger.exception("LLM query failed for dataset %s.", payload.dataset_id)
@@ -107,7 +102,7 @@ async def query_dataset(
         )
 
     # ------------------------------------------------------------------
-    # 5. Log the query (non-blocking; do not fail the request on log failure)
+    # 4. Log the query (non-blocking; do not fail the request on log failure)
     # ------------------------------------------------------------------
     try:
         from app.models.query_log import QueryLog
