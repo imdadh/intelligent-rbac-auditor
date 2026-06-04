@@ -1,0 +1,73 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# Intelligent RBAC Policy Auditor — Docker Compose stack
+#
+# Services
+# --------
+# db   PostgreSQL 15 with a named volume for data persistence and a health
+#      check that gates the web service startup.
+# web  FastAPI application built from the project Dockerfile.  Starts only
+#      after the database reports healthy; runs the entrypoint script which
+#      applies Alembic migrations, optionally seeds synthetic data, and then
+#      launches uvicorn.
+#
+# Quick start
+# -----------
+#   cp .env.example .env          # fill in LLM credentials at minimum
+#   docker-compose up --build
+#   open http://localhost:8000
+# ---------------------------------------------------------------------------
+
+services:
+
+  # -------------------------------------------------------------------------
+  # Database
+  # -------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rbac_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rbac_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rbac_auditor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose on 5433 to avoid clashing with a local PostgreSQL instance.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rbac_user} -d ${POSTGRES_DB:-rbac_auditor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # -------------------------------------------------------------------------
+  # Web / API service
+  # -------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL so it always points at the compose db service
+      # regardless of what the .env file contains locally.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rbac_user}:${POSTGRES_PASSWORD:-rbac_password}@db:5432/${POSTGRES_DB:-rbac_auditor}
+    volumes:
+      # Mount the source tree for development convenience.  Remove this
+      # volume entry for a fully self-contained production-style build.
+      - .:/app
+    entrypoint: ["/app/docker-entrypoint.sh"]
+
+volumes:
+  postgres_data:
+    driver: local
