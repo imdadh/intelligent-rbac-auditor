@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from langchain_core.output_parsers import PydanticOutputParser
@@ -128,8 +128,8 @@ class OpenAIProvider(BaseLLMProvider):
         "Given the following context about a tenant's role assignments, "
         "users, and audit findings, answer the user's natural-language question.\n\n"
         "Rules:\n"
-        "1. If the question cannot be answered from the provided context, set "answerable" to false.\n"
-        "2. Otherwise, set "answerable" to true and provide:\n"
+        "1. If the question cannot be answered from the provided context, set 'answerable' to false.\n"
+        "2. Otherwise, set 'answerable' to true and provide:\n"
         "   - structured_data: an array of matching records or computed values\n"
         "   - natural_language_summary: a clear, concise answer\n"
         "Return a JSON object with keys: structured_data, natural_language_summary, answerable."
@@ -226,7 +226,7 @@ class OpenAIProvider(BaseLLMProvider):
         findings: list[LLMFindingOutput] = result.findings
 
         # Convert to FindingSchema with generated UUIDs and timestamps.
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         converted: list[FindingSchema] = []
         for f in findings:
             # Ensure the category matches what we expect (the LLM might get it wrong).
