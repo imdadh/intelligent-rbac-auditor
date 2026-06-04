@@ -41,5 +41,5 @@ class AuditDetailResponse(BaseModel):
     created_at: datetime
     findings: list[FindingSchema] = Field(
         default_factory=list,
-        description="Structured findings produced by the audit (only present when status is 'completed').",
+        description="Structured findings from the audit (present when status is completed).",
     )
