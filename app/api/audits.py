@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.audit import Audit
+from app.models.base import get_db
 from app.models.dataset import Dataset
 from app.schemas.audit import AuditCreate, AuditStatusResponse
 from app.schemas.common import DataResponse, Meta
@@ -153,13 +154,3 @@ async def create_audit(
 
 
 # Re-usable dependency for database session
-def get_db() -> Session:
-    """FastAPI dependency that yields a database session."""
-    from app.models.base import SessionLocal, _ensure_session_factory_bound
-
-    _ensure_session_factory_bound()
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
