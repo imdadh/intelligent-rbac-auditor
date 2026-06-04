@@ -99,7 +99,7 @@
   - [ ] 4.6 Implement the pipeline orchestrator in `app/services/pipeline.py`: load dataset, run preprocessor, call LLM for each finding category, parse structured output, and store findings in the `findings` table
   - [ ] 4.7 Implement `POST /api/v1/audits` endpoint that accepts a `dataset_id`, creates an audit record with status `pending`, kicks off background processing (using FastAPI `BackgroundTasks`), and returns 202 with audit ID
   - [ ] 4.8 Implement `GET /api/v1/audits/{audit_id}` endpoint that returns audit status and (if completed) the full structured results from the `findings` table
-  - [ ] 4.9 Wire up the LLM provider selection based on `LLM_PROVIDER` env var and configure in `app/llm/__init__.py`
+  - [x] 4.9 Wire up the LLM provider selection based on `LLM_PROVIDER` env var and configure in `app/llm/__init__.py`
 - [ ] 5.0 Implement report generation and natural-language query interface
   - [ ] 5.1 Implement `GET /api/v1/audits/{audit_id}/report?format=json` returning the complete structured JSON report (metadata, summary, findings array)
   - [ ] 5.2 Implement `GET /api/v1/audits/{audit_id}/report?format=markdown` generating a human-readable Markdown narrative with executive summary and per-finding explanations
