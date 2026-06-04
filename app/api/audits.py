@@ -4,7 +4,8 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -208,3 +209,211 @@ def get_audit(
         data=data,
         meta=Meta(),
     )
+
+
+# ------------------------------------------------------------------
+# GET /api/v1/audits/{audit_id}/report?format=markdown
+# ------------------------------------------------------------------
+@router.get(
+    "/{audit_id}/report",
+    summary="Get audit report in Markdown format",
+    description=(
+        "Returns a human-readable Markdown report for a completed audit. "
+        "The report includes an executive summary, findings grouped by severity, "
+        "and each finding's plain-language narrative explanation. "
+        "Only the 'markdown' format is supported in this phase."
+    ),
+)
+def get_audit_report(
+    audit_id: uuid.UUID,
+    format: str = Query(
+        "markdown", description="Report format (only 'markdown' supported)"
+    ),
+    db: Session = Depends(get_db),
+) -> PlainTextResponse:
+    """Generate a Markdown narrative report from the audit findings."""
+    if format != "markdown":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported report format '{format}'. Only 'markdown' is available.",
+        )
+
+    audit: Audit | None = db.query(Audit).filter(Audit.id == audit_id).first()
+    if audit is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Audit {audit_id} not found.",
+        )
+
+    if audit.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Audit {audit_id} has status '{audit.status}'. Report is only available when status is 'completed'.",
+        )
+
+    # Fetch findings ordered by creation time
+    findings_orm = (
+        db.query(Finding)
+        .filter(Finding.audit_id == audit_id)
+        .order_by(Finding.created_at.asc())
+        .all()
+    )
+
+    if not findings_orm:
+        # No findings – still generate a minimal report
+        markdown = _generate_empty_report(audit)
+    else:
+        markdown = _generate_markdown_report(audit, findings_orm)
+
+    return PlainTextResponse(
+        content=markdown,
+        media_type="text/markdown",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+def _generate_markdown_report(audit: Audit, findings: list[Finding]) -> str:
+    """Build a Markdown narrative report from audit metadata and findings.
+
+    The report includes:
+    - Header with title and audit metadata
+    - Executive summary (from audit.summary if present)
+    - Findings grouped by severity (critical, high, medium, low)
+    - Each finding includes the narrative field (stored from LLM analysis)
+    """
+    lines: list[str] = []
+
+    # Title and metadata
+    lines.append("# Intelligent RBAC Policy Auditor — Audit Report")
+    lines.append("")
+    lines.append(f"**Audit ID:** `{audit.id}`")
+    lines.append(f"**Dataset ID:** `{audit.dataset_id}`")
+    lines.append("**Status:** Completed")
+    lines.append(
+        f"**Created at:** {audit.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if audit.created_at else 'N/A'}"
+    )
+    lines.append(
+        f"**Completed at:** {audit.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC') if audit.completed_at else 'N/A'}"
+    )
+
+    if audit.parameters:
+        lines.append("")
+        lines.append("**Parameters:**")
+        for key, value in audit.parameters.items():
+            lines.append(f"- {key}: {value}")
+    lines.append("")
+
+    # Executive summary
+    lines.append("---")
+    lines.append("## Executive Summary")
+    lines.append("")
+
+    if audit.summary:
+        summary = audit.summary
+        total_users = summary.get("total_users_analysed", "N/A")
+        total_findings = summary.get("total_findings", 0)
+        findings_by_category = summary.get("findings_by_category", {})
+        findings_by_severity = summary.get("findings_by_severity", {})
+
+        lines.append(f"- **Total users analysed:** {total_users}")
+        lines.append(f"- **Total findings:** {total_findings}")
+        lines.append("")
+        if findings_by_category:
+            lines.append("**Findings by category:**")
+            for cat, count in findings_by_category.items():
+                lines.append(f"  - {cat}: {count}")
+        lines.append("")
+        if findings_by_severity:
+            lines.append("**Findings by severity:**")
+            for sev, count in findings_by_severity.items():
+                lines.append(f"  - {sev}: {count}")
+    else:
+        lines.append("No summary available.")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # Group findings by severity (order: critical, high, medium, low)
+    severity_order = ["critical", "high", "medium", "low"]
+    grouped: dict[str, list[Finding]] = {sev: [] for sev in severity_order}
+    for f in findings:
+        sev = f.severity.lower()
+        if sev in grouped:
+            grouped[sev].append(f)
+        else:
+            # If LLM returned an unknown severity, put in low
+            grouped["low"].append(f)
+
+    severity_emoji = {
+        "critical": "🔴",
+        "high": "🟠",
+        "medium": "🟡",
+        "low": "⚪",
+    }
+
+    for sev in severity_order:
+        sev_findings = grouped[sev]
+        if not sev_findings:
+            continue
+        emoji = severity_emoji.get(sev, "")
+        lines.append(
+            f"## {emoji} {sev.capitalize()} Severity Findings ({len(sev_findings)})"
+        )
+        lines.append("")
+
+        for idx, finding in enumerate(sev_findings, start=1):
+            lines.append(
+                f"### {idx}. {finding.principal_name} (`{finding.principal_id}`)"
+            )
+            lines.append("")
+            lines.append(f"- **Category:** {finding.category}")
+            lines.append(f"- **Principal type:** {finding.principal_type}")
+            lines.append(
+                f"- **Roles:** {', '.join(ra.get('role_name', '?') for ra in finding.role_assignments)}"
+            )
+            lines.append("- **Evidence:**")
+            for key, value in finding.evidence.items():
+                lines.append(f"  - {key}: {value}")
+            lines.append(f"- **Remediation:** {finding.remediation}")
+            lines.append("")
+            lines.append("**Narrative:**")
+            lines.append("")
+            lines.append(finding.narrative)
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    # Footer
+    lines.append("*Report generated by Intelligent RBAC Policy Auditor*")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def _generate_empty_report(audit: Audit) -> str:
+    """Generate a minimal report when no findings were produced."""
+    lines: list[str] = []
+    lines.append("# Intelligent RBAC Policy Auditor — Audit Report")
+    lines.append("")
+    lines.append(f"**Audit ID:** `{audit.id}`")
+    lines.append(f"**Dataset ID:** `{audit.dataset_id}`")
+    lines.append("**Status:** Completed (no findings)")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Executive Summary")
+    lines.append("")
+    if audit.summary:
+        lines.append(
+            f"- **Total users analysed:** {audit.summary.get('total_users_analysed', 'N/A')}"
+        )
+        lines.append("- **Total findings:** 0")
+    else:
+        lines.append(
+            "No findings were produced by the audit. All accounts appear to be correctly provisioned."
+        )
+    lines.append("")
+    lines.append("*Report generated by Intelligent RBAC Policy Auditor*")
+    lines.append("")
+    return "\n".join(lines)
