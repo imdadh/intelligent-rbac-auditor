@@ -100,7 +100,7 @@
   - [ ] 1.7 Verify the setup by running `docker-compose build` successfully and confirming `docker-compose up` starts both services (database connects, FastAPI serves on port 8000 — even if no routes exist yet)
 - [ ] 2.0 Define database models, Pydantic schemas, and Alembic migrations
   - [x] 2.1 Implement `app/models/base.py` with SQLAlchemy 2.0 declarative base, engine creation from `DATABASE_URL`, and session factory (sync is acceptable; use async with asyncpg if comfortable)
-  - [ ] 2.2 Implement `app/models/dataset.py` with a `Dataset` model: columns for `id` (UUID primary key), `name`, `raw_data` (JSON/JSONB), `user_count`, `role_count`, `created_at` timestamp
+  - [x] 2.2 Implement `app/models/dataset.py` with a `Dataset` model: columns for `id` (UUID primary key), `name`, `raw_data` (JSON/JSONB), `user_count`, `role_count`, `created_at` timestamp
   - [ ] 2.3 Implement `app/models/audit.py` with an `Audit` model: columns for `id` (UUID), `dataset_id` (FK to datasets), `status` (enum: pending/running/completed/failed), `parameters` (JSON), `summary` (JSON, nullable), `started_at`, `completed_at`, `created_at`
   - [ ] 2.4 Implement `app/models/finding.py` with a `Finding` model: columns for `id` (UUID), `audit_id` (FK to audits), `category` (enum: overprivileged/dormant_privileged), `severity` (enum: critical/high/medium/low), `principal_id`, `principal_name`, `principal_type`, `role_assignments` (JSON), `evidence` (JSON), `remediation`, `narrative`, `created_at`
   - [ ] 2.5 Implement `app/models/query_log.py` with a `QueryLog` model: columns for `id` (UUID), `dataset_id` (FK), `question` (text), `structured_response` (JSON), `natural_language_response` (text), `created_at`
