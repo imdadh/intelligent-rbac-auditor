@@ -93,7 +93,7 @@
 - [ ] 4.0 Implement audit pipeline with pre-processing, LLM provider interface, and finding detection
   - [ ] 4.1 Define abstract `BaseLLMProvider` in `app/llm/base.py` with methods `analyze_findings(preprocessed_data)` and `answer_query(question, context)`, returning structured Pydantic models
   - [ ] 4.2 Implement `OpenAIProvider` in `app/llm/openai_provider.py` using LangChain's `ChatOpenAI` with retry logic (exponential backoff, 3 attempts)
-  - [ ] 4.3 Implement `AzureOpenAIProvider` in `app/llm/azure_provider.py` using `AzureChatOpenAI` with configurable deployment, endpoint, and API key
+  - [x] 4.3 Implement `AzureOpenAIProvider` in `app/llm/azure_provider.py` using `AzureChatOpenAI` with configurable deployment, endpoint, and API key
   - [ ] 4.4 Create prompt templates in `app/llm/prompts/` for overprivileged detection, dormant detection, and query answering, storing them as separate text files
   - [ ] 4.5 Implement preprocessor in `app/services/preprocessor.py` that computes: days since last sign-in, role tier classification (critical/high/medium/low), assignment type (direct vs. group), and count of privileged roles per user
   - [ ] 4.6 Implement the pipeline orchestrator in `app/services/pipeline.py`: load dataset, run preprocessor, call LLM for each finding category, parse structured output, and store findings in the `findings` table
