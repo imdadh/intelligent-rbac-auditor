@@ -101,7 +101,7 @@
   - [ ] 4.8 Write unit tests for preprocessor and LLM provider (mocked). Write integration test that runs full pipeline on the small dataset and asserts the 4 known overprivileged + 4 known dormant accounts are flagged.
 - [ ] 5.0 Implement report generation and natural-language query interface
   - [x] 5.1 Implement `GET /api/v1/audits/{audit_id}/report?format=markdown` in `app/api/audits.py` that generates a Markdown narrative: executive summary, findings grouped by severity, each finding with 2-4 sentence explanation in plain language. Use LLM to generate narrative if needed, but can also be templated.
-  - [ ] 5.2 Implement `POST /api/v1/query` in `app/api/query.py`: accept `QueryRequest` with dataset_id and question, call `BaseLLMProvider.answer_query()` with the preprocessed dataset context, return structured answer JSON and natural-language summary. Handle unanswerable questions gracefully.
+  - [x] 5.2 Implement `POST /api/v1/query` in `app/api/query.py`: accept `QueryRequest` with dataset_id and question, call `BaseLLMProvider.answer_query()` with the preprocessed dataset context, return structured answer JSON and natural-language summary. Handle unanswerable questions gracefully.
   - [ ] 5.3 Implement the query engine in `app/services/query_engine.py` that constructs a context string from the dataset (e.g., list of users with roles and last sign-in) and calls the LLM.
   - [ ] 5.4 Write integration tests for report generation and query interface using the synthetic dataset.
 - [ ] 6.0 Build minimal web UI and serve static assets
