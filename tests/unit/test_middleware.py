@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app
+from app.models.base import get_db
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -33,24 +34,44 @@ def client() -> TestClient:
 def client_with_low_rate_limit() -> TestClient:
     """Return a TestClient but override the rate limit to a low value
     (2 per minute) so we can test rate-limit behaviour quickly."""
-    # Patch the environment variable before settings are read
     with patch.dict(os.environ, {"RATE_LIMIT_PER_MINUTE": "2"}):
         get_settings.cache_clear()
         yield TestClient(app)
 
 
 @pytest.fixture
-def client_with_auth_enabled() -> TestClient:
-    """Return a TestClient with authentication enabled and a known key."""
+def mock_db_session() -> MagicMock:
+    """Return a mock SQLAlchemy session that can be used as a dependency."""
+    session = MagicMock()
+    # Simulate that dataset queries return None (no data) to avoid DB hits.
+    session.query.return_value.filter.return_value.first.return_value = None
+    return session
+
+
+@pytest.fixture
+def client_with_auth_enabled(mock_db_session) -> TestClient:
+    """Return a TestClient with authentication enabled, a known API key,
+    and a mock database override so the tests do not require a real DB."""
+
+    def override_get_db():
+        try:
+            yield mock_db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
     with patch.dict(
         os.environ,
         {
             "AUTH_ENABLED": "true",
-            "API_KEY": "test-api-key-123",
+            "API_KEY": "test-api-key-123",  # pragma: allowlist secret
         },
     ):
         get_settings.cache_clear()
         yield TestClient(app)
+
+    app.dependency_overrides.pop(get_db, None)
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +165,9 @@ class TestAuthentication:
 
     def test_auth_enabled_valid_key(self, client_with_auth_enabled):
         """When AUTH_ENABLED is true, requests with the correct API key
-        should succeed."""
-        headers = {"Authorization": "Bearer test-api-key-123  # pragma: allowlist secret"}
+        should succeed (returning non-401)."""
+        # Use exact key without extra spaces or comments.
+        headers = {"Authorization": "Bearer test-api-key-123"}  # pragma: allowlist secret
         resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
         # The endpoint might return 404 if no dataset exists (acceptable),
         # but it should NOT return 401.
