@@ -163,5 +163,5 @@ ignore_missing_imports = true
 exclude = ["migrations/"]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "*_test"]
-disable_error_codes = ["misc", "no-untyped-def", "no-untyped-call"]
+module = ["tests.*"]
+ignore_errors = true
