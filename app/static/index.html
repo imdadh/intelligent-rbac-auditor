@@ -3,86 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intelligent RBAC Policy Auditor</title>
+  <title>RBAC Policy Auditor</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="container">
+  <div id="app">
     <header>
-      <h1>🔐 Intelligent RBAC Policy Auditor</h1>
-      <p class="subtitle">Azure AD role-assignment audit with LLM-powered analysis</p>
+      <h1>🔍 Intelligent RBAC Policy Auditor</h1>
+      <p class="tagline">Audit Azure AD role assignments for overprivileged and dormant accounts</p>
     </header>
-
-    <nav class="stepper" aria-label="Audit workflow steps">
-      <ol>
-        <li class="step" data-step="1">
-          <span class="step-indicator">1</span>
-          <span class="step-label">Load Data</span>
-        </li>
-        <li class="step" data-step="2">
-          <span class="step-indicator">2</span>
-          <span class="step-label">Run Audit</span>
-        </li>
-        <li class="step" data-step="3">
-          <span class="step-indicator">3</span>
-          <span class="step-label">View Findings</span>
-        </li>
-        <li class="step" data-step="4">
-          <span class="step-indicator">4</span>
-          <span class="step-label">Ask Questions</span>
-        </li>
-      </ol>
-    </nav>
 
     <main>
       <!-- Step 1: Load Data -->
-      <section id="load-data" class="step-panel active">
-        <h2>Load Dataset</h2>
-        <p>Upload a synthetic Azure AD role-assignment export or use the built-in sample dataset.</p>
-        <div class="button-group">
-          <button id="load-sample-btn" class="btn btn-primary">Load Sample Data</button>
-          <label class="btn btn-secondary">
-            Upload JSON
-            <input type="file" id="upload-json" accept=".json" hidden>
-          </label>
-        </div>
-        <div id="dataset-status" class="status-message"></div>
+      <section class="step" id="step-load">
+        <h2>1. Load Data</h2>
+        <p>Load the sample synthetic Azure AD snapshot to begin an audit.</p>
+        <button id="load-sample-btn" class="btn btn-primary">
+          ⬇️ Load Sample Data
+        </button>
+        <div id="load-status" class="status-message"></div>
       </section>
 
       <!-- Step 2: Run Audit -->
-      <section id="run-audit" class="step-panel">
-        <h2>Trigger Audit</h2>
-        <p>Start the analysis pipeline to detect overprivileged and dormant privileged accounts.</p>
-        <button id="run-audit-btn" class="btn btn-primary" disabled>Run Audit</button>
+      <section class="step" id="step-audit">
+        <h2>2. Run Audit</h2>
+        <p>Trigger an audit on the loaded dataset to detect overprivileged and dormant role assignments.</p>
+        <button id="run-audit-btn" class="btn btn-secondary" disabled>
+          🚀 Run Audit
+        </button>
         <div id="audit-status" class="status-message"></div>
       </section>
 
       <!-- Step 3: View Findings -->
-      <section id="view-findings" class="step-panel">
-        <h2>Audit Findings</h2>
-        <div id="findings-summary" class="summary"></div>
-        <div id="findings-list" class="findings-container"></div>
+      <section class="step" id="step-findings">
+        <h2>3. View Findings</h2>
+        <div id="findings-container">
+          <p class="placeholder">Load a dataset and run an audit to see findings here.</p>
+        </div>
+        <!-- Collapsible Markdown report -->
         <details id="report-details">
-          <summary>📄 Narrative Report (Markdown)</summary>
-          <div id="report-content" class="markdown-body"></div>
+          <summary>📄 View Narrative Report (Markdown)</summary>
+          <div id="report-content" class="markdown-report"></div>
         </details>
       </section>
 
-      <!-- Step 4: Chat Box -->
-      <section id="chat-box" class="step-panel">
-        <h2>Ask a Question</h2>
-        <p>Ask natural-language questions about the dataset and audit results.</p>
-        <div id="chat-history" class="chat-history"></div>
-        <form id="query-form" class="query-form">
-          <input type="text" id="query-input" placeholder="e.g., Show users with Global Admin who haven't signed in for 30 days" required>
-          <button type="submit" id="query-submit" class="btn btn-primary">Ask</button>
-        </form>
-        <div id="query-error" class="status-message error"></div>
+      <!-- Step 4: Ask Questions -->
+      <section class="step" id="step-query">
+        <h2>4. Ask Questions</h2>
+        <p>Ask natural-language questions about the dataset and audit findings.</p>
+        <div class="query-input-group">
+          <input type="text" id="query-input" placeholder="e.g. Show users with Global Admin who haven't signed in for 30 days" disabled>
+          <button id="query-btn" class="btn btn-accent" disabled>Ask</button>
+        </div>
+        <div id="query-response" class="query-response"></div>
       </section>
     </main>
 
     <footer>
-      <p>Intelligent RBAC Policy Auditor · Phase 1</p>
+      <p>RBAC Policy Auditor &mdash; Portfolio Project</p>
     </footer>
   </div>
 
