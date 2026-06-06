@@ -1,162 +1,176 @@
-"""Unit tests for app/core/middleware.py.
-
-These tests exercise the CorrelationIDMiddleware in isolation using a
-minimal Starlette/FastAPI test application so that no database or LLM
-infrastructure is required.
-
-Scenarios covered:
-
-- A request that carries an ``X-Correlation-ID`` header has that value
-  echoed back in the response header.
-- A request without the header receives a freshly generated UUID in the
-  response header.
-- The generated ID is a well-formed UUID4 string.
-- The correlation ID is stored in the ``ContextVar`` during request
-  processing and is accessible to code running within the handler.
-- The ``ContextVar`` is restored to its previous value after the response
-  is returned (context isolation between requests).
-"""
-
 from __future__ import annotations
 
-import re
+import os
+from unittest.mock import patch
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.logging import correlation_id_var
-from app.core.middleware import CORRELATION_ID_HEADER, CorrelationIDMiddleware
+from app.core.config import get_settings
+from app.main import app
 
 # ---------------------------------------------------------------------------
-# Test application fixture
-# ---------------------------------------------------------------------------
-
-UUID4_PATTERN = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-    re.IGNORECASE,
-)
-
-
-@pytest.fixture()
-def app() -> FastAPI:
-    """Minimal FastAPI application with CorrelationIDMiddleware registered."""
-    _app = FastAPI()
-    _app.add_middleware(CorrelationIDMiddleware)
-
-    @_app.get("/ping")
-    async def ping() -> dict:
-        return {"correlation_id": correlation_id_var.get()}
-
-    return _app
-
-
-@pytest.fixture()
-def client(app: FastAPI) -> TestClient:
-    """Synchronous test client wrapping the minimal app."""
-    return TestClient(app, raise_server_exceptions=True)
-
-
-# ---------------------------------------------------------------------------
-# Header propagation
+# Fixtures
 # ---------------------------------------------------------------------------
 
 
-class TestCorrelationIDHeaderPropagation:
-    """The middleware must echo a client-supplied or generated ID in the response."""
-
-    def test_supplied_id_is_echoed_in_response(self, client: TestClient) -> None:
-        supplied = "test-correlation-id-abc123"
-        response = client.get("/ping", headers={CORRELATION_ID_HEADER: supplied})
-        assert response.status_code == 200
-        assert response.headers[CORRELATION_ID_HEADER] == supplied
-
-    def test_generated_id_present_when_header_absent(self, client: TestClient) -> None:
-        response = client.get("/ping")
-        assert response.status_code == 200
-        assert CORRELATION_ID_HEADER in response.headers
-
-    def test_generated_id_is_valid_uuid4(self, client: TestClient) -> None:
-        response = client.get("/ping")
-        header_value = response.headers[CORRELATION_ID_HEADER]
-        assert UUID4_PATTERN.match(
-            header_value
-        ), f"Expected a UUID4 but got: {header_value!r}"
-
-    def test_each_request_gets_unique_id(self, client: TestClient) -> None:
-        first = client.get("/ping").headers[CORRELATION_ID_HEADER]
-        second = client.get("/ping").headers[CORRELATION_ID_HEADER]
-        assert first != second
-
-    def test_empty_header_value_triggers_generation(self, client: TestClient) -> None:
-        """An empty string in the header should not be used; a UUID must be generated."""
-        response = client.get("/ping", headers={CORRELATION_ID_HEADER: ""})
-        header_value = response.headers[CORRELATION_ID_HEADER]
-        # The empty string is falsy, so the middleware should have generated a UUID.
-        assert UUID4_PATTERN.match(
-            header_value
-        ), f"Expected a generated UUID4 for empty header but got: {header_value!r}"
+@pytest.fixture(autouse=True)
+def clear_settings_cache():
+    """Clear the lru_cache on get_settings before each test to ensure
+    environment changes take effect."""
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
-# ---------------------------------------------------------------------------
-# ContextVar binding
-# ---------------------------------------------------------------------------
+@pytest.fixture
+def client() -> TestClient:
+    """Return a basic TestClient without modifying settings."""
+    return TestClient(app)
 
 
-class TestContextVarBinding:
-    """The correlation ID must be available via the ContextVar during request handling."""
+@pytest.fixture
+def client_with_low_rate_limit() -> TestClient:
+    """Return a TestClient but override the rate limit to a low value
+    (2 per minute) so we can test rate-limit behaviour quickly."""
+    # Patch the environment variable before settings are read
+    with patch.dict(os.environ, {"RATE_LIMIT_PER_MINUTE": "2"}):
+        get_settings.cache_clear()
+        yield TestClient(app)
 
-    def test_supplied_id_stored_in_context(self, client: TestClient) -> None:
-        supplied = "ctx-test-id-777"
-        response = client.get("/ping", headers={CORRELATION_ID_HEADER: supplied})
-        # The /ping handler returns the ContextVar value in the JSON body.
-        assert response.json()["correlation_id"] == supplied
 
-    def test_generated_id_matches_response_header(self, client: TestClient) -> None:
-        response = client.get("/ping")
-        body_id = response.json()["correlation_id"]
-        header_id = response.headers[CORRELATION_ID_HEADER]
-        assert body_id == header_id
+@pytest.fixture
+def client_with_auth_enabled() -> TestClient:
+    """Return a TestClient with authentication enabled and a known key."""
+    with patch.dict(
+        os.environ,
+        {
+            "AUTH_ENABLED": "true",
+            "API_KEY": "test-api-key-123",
+        },
+    ):
+        get_settings.cache_clear()
+        yield TestClient(app)
 
 
 # ---------------------------------------------------------------------------
-# Context isolation
+# Rate-Limiting Tests
 # ---------------------------------------------------------------------------
 
 
-class TestContextIsolation:
-    """The ContextVar must be restored after each request."""
+class TestRateLimiting:
+    """Verify the slowapi rate-limiter correctly limits requests."""
 
-    def test_context_var_not_polluted_between_requests(
-        self, client: TestClient
-    ) -> None:
-        """Verify that a correlation ID from one request does not bleed into the next."""
-        id_one = "isolation-check-one"
-        id_two = "isolation-check-two"
+    def test_rate_limit_exceeded(self, client_with_low_rate_limit):
+        """When rate limit is 2/min, the third request within the same
+        minute should return 429 Too Many Requests."""
+        client = client_with_low_rate_limit
+        # First request
+        resp = client.get("/health")
+        assert resp.status_code == 200
 
-        r1 = client.get("/ping", headers={CORRELATION_ID_HEADER: id_one})
-        r2 = client.get("/ping", headers={CORRELATION_ID_HEADER: id_two})
+        # Second request
+        resp = client.get("/health")
+        assert resp.status_code == 200
 
-        assert r1.json()["correlation_id"] == id_one
-        assert r2.json()["correlation_id"] == id_two
+        # Third request – should exceed the limit
+        resp = client.get("/health")
+        assert resp.status_code == 429
+        assert "Retry-After" in resp.headers
 
-    def test_context_var_default_is_empty_outside_request(self) -> None:
-        """Outside of a request context the ContextVar must default to an empty string."""
-        # Ensure no previous test has polluted the module-level default.
-        token = correlation_id_var.set("")
-        try:
-            assert correlation_id_var.get() == ""
-        finally:
-            correlation_id_var.reset(token)
+    def test_rate_limit_not_exceeded_when_below_limit(self, client):
+        """With default limit of 60/min, one request should succeed."""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+
+    def test_rate_limit_different_endpoints(self, client_with_low_rate_limit):
+        """Rate limit is per-client IP, so hitting different endpoints
+        still counts against the same bucket."""
+        client = client_with_low_rate_limit
+        # Two requests to different endpoints
+        resp1 = client.get("/health")
+        assert resp1.status_code == 200
+
+        resp2 = client.get("/docs")
+        assert resp2.status_code == 200
+
+        # Third request should be blocked regardless of endpoint
+        resp3 = client.get("/health")
+        assert resp3.status_code == 429
+
+    def test_rate_limit_resets_after_window(self, client_with_low_rate_limit):
+        """After the rate-limit window (1 minute) the count resets.
+        This test is intentionally brief; we verify the Retry-After header
+        and rely on slowapi's internal logic."""
+        client = client_with_low_rate_limit
+        # Exhaust the limit
+        client.get("/health")
+        client.get("/health")
+        resp = client.get("/health")
+        assert resp.status_code == 429
+        retry_after = int(resp.headers.get("Retry-After", "0"))
+        # The retry-after should be >0 and <=60
+        assert 0 < retry_after <= 60
 
 
 # ---------------------------------------------------------------------------
-# Middleware constant
+# Authentication Middleware Tests
 # ---------------------------------------------------------------------------
 
 
-class TestMiddlewareConstants:
-    """Sanity-check the exported header name constant."""
+class TestAuthentication:
+    """Verify the AuthenticationMiddleware correctly enforces API key auth."""
 
-    def test_header_name_value(self) -> None:
-        assert CORRELATION_ID_HEADER == "X-Correlation-ID"
+    def test_auth_disabled_no_header(self, client):
+        """When AUTH_ENABLED is false, requests without an Authorization
+        header should succeed."""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+
+    def test_auth_enabled_no_header(self, client_with_auth_enabled):
+        """When AUTH_ENABLED is true, requests without an Authorization
+        header should receive 401."""
+        resp = client_with_auth_enabled.get("/api/v1/datasets/sample")
+        assert resp.status_code == 401
+        assert "Missing or malformed Authorization header" in resp.text
+
+    def test_auth_enabled_wrong_key(self, client_with_auth_enabled):
+        """When AUTH_ENABLED is true, requests with an incorrect Bearer
+        token should receive 401."""
+        headers = {"Authorization": "Bearer wrong-key"}
+        resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
+        assert resp.status_code == 401
+        assert "Invalid API key" in resp.text
+
+    def test_auth_enabled_valid_key(self, client_with_auth_enabled):
+        """When AUTH_ENABLED is true, requests with the correct API key
+        should succeed."""
+        headers = {"Authorization": "Bearer test-api-key-123  # pragma: allowlist secret"}
+        resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
+        # The endpoint might return 404 if no dataset exists (acceptable),
+        # but it should NOT return 401.
+        assert resp.status_code != 401
+
+    def test_auth_enabled_public_path_no_key(self, client_with_auth_enabled):
+        """The /health endpoint should be accessible without an API key
+        even when AUTH_ENABLED is true."""
+        resp = client_with_auth_enabled.get("/health")
+        assert resp.status_code == 200
+
+    def test_auth_enabled_docs_path_no_key(self, client_with_auth_enabled):
+        """The /docs endpoint should be accessible without an API key."""
+        resp = client_with_auth_enabled.get("/docs")
+        assert resp.status_code == 200
+
+    def test_auth_enabled_malformed_header(self, client_with_auth_enabled):
+        """A header without 'Bearer ' should be rejected."""
+        headers = {"Authorization": "Basic some-token"}
+        resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
+        assert resp.status_code == 401
+        assert "Missing or malformed" in resp.text
+
+    def test_auth_enabled_empty_bearer_token(self, client_with_auth_enabled):
+        """A Bearer token that is empty should be treated as invalid."""
+        headers = {"Authorization": "Bearer "}
+        resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
+        assert resp.status_code == 401

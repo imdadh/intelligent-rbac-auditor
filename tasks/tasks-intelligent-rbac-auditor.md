@@ -148,7 +148,7 @@
   - [x] 7.2 Implement optional API key authentication middleware: check `Authorization: Bearer <key>` against `API_KEY` env var when `AUTH_ENABLED=true`
   - [x] 7.3 Add a `GET /health` endpoint that returns database connectivity status, service version, and uptime
   - [x] 7.4 Add a middleware that generates or forwards a correlation ID (`X-Correlation-ID`) and includes it in all log entries
-  - [ ] 7.5 Write unit tests for rate‑limiting and auth middleware (using test client)
+  - [x] 7.5 Write unit tests for rate‑limiting and auth middleware (using test client)
   - [ ] 7.6 Update the logging configuration in `app/core/logging.py` to automatically attach the correlation ID
   - [ ] 7.7 Add startup validation to ensure required environment variables (e.g., `DATABASE_URL`) are present and valid
 - [ ] 8.0 Write integration and unit tests, verify coverage, and finalize documentation
