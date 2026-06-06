@@ -157,3 +157,11 @@ known-first-party = ["app", "scripts"]
 
 [tool.bandit]
 skips = ["B311"]  # pseudo-random generators acceptable in synthetic data scripts
+
+[tool.mypy]
+ignore_missing_imports = true
+exclude = ["migrations/"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "*_test"]
+disable_error_codes = ["misc", "no-untyped-def", "no-untyped-call"]
