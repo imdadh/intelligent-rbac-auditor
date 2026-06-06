@@ -130,7 +130,7 @@
 - [ ] 6.0 Build minimal web UI and serve static assets
   - [x] 6.1 Create `app/static/index.html` with dark-themed layout containing steps: load data, run audit, view findings, chat box.
   - [x] 6.2 Create `app/static/style.css` with severity badge colors (red/orange/yellow/gray) and responsive design.
-  - [ ] 6.3 Create `app/static/script.js` implementing API calls: load sample data (calls POST datasets), trigger audit (POST audits), poll status, fetch report, send query.
+  - [x] 6.3 Create `app/static/script.js` implementing API calls: load sample data (calls POST datasets), trigger audit (POST audits), poll status, fetch report, send query.
   - [ ] 6.4 Configure FastAPI to serve static files at `/` and `/static/*` in `app/main.py`.
   - [ ] 6.5 Add a "load sample data" button that calls the data generation endpoint (or uses pre-generated JSON).
   - [ ] 6.6 Test UI flow manually: load data, run audit, verify findings appear with severity badges, ask a test query.
