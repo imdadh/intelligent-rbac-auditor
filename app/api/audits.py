@@ -9,6 +9,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.logging import correlation_id_var
 from app.models.audit import Audit
 from app.models.base import get_db
 from app.models.dataset import Dataset
@@ -37,12 +38,21 @@ def _get_background_db() -> Session:
 # ------------------------------------------------------------------
 # Background task wrapper
 # ------------------------------------------------------------------
-def _run_audit_background(dataset_id: uuid.UUID, dormant_threshold_days: int) -> None:
+def _run_audit_background(
+    dataset_id: uuid.UUID,
+    dormant_threshold_days: int,
+    correlation_id: str,
+) -> None:
     """Execute the audit pipeline in background and update the audit record.
 
     This function opens and closes its own database session to avoid
     sharing the request's session.
     """
+    # Propagate the correlation ID from the triggering request so that
+    # log entries emitted during the background task are correlated.
+    if correlation_id:
+        correlation_id_var.set(correlation_id)
+
     db: Session = _get_background_db()
     try:
         # Instantiate the LLM provider based on configuration
@@ -115,6 +125,10 @@ async def create_audit(
     settings = get_settings()
     dormant_threshold_days = settings.dormant_threshold_days
 
+    # Capture the correlation ID from the current request context so it can
+    # be propagated to the background task.
+    correlation_id = correlation_id_var.get()
+
     # Create the audit record with status 'pending'
     audit = Audit(
         dataset_id=payload.dataset_id,
@@ -129,11 +143,12 @@ async def create_audit(
     db.commit()
     db.refresh(audit)
 
-    # Schedule the background task
+    # Schedule the background task, passing the correlation ID
     background_tasks.add_task(
         _run_audit_background,
         dataset_id=payload.dataset_id,
         dormant_threshold_days=dormant_threshold_days,
+        correlation_id=correlation_id,
     )
 
     logger.info(
