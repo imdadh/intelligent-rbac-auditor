@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     )
 
     # OpenAI
+    openai_base_url: str | None = Field(
+        default=None,
+        description="Custom base URL for OpenAI-compatible APIs (e.g. DeepSeek: https://api.deepseek.com).",
+    )
     openai_api_key: str | None = Field(
         default=None,
         description="API key for the OpenAI platform.  Required when llm_provider='openai'.",

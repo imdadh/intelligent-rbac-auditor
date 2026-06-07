@@ -40,6 +40,7 @@ def _get_background_db() -> Session:
 # ------------------------------------------------------------------
 def _run_audit_background(
     dataset_id: uuid.UUID,
+    audit_id: uuid.UUID,
     dormant_threshold_days: int,
     correlation_id: str,
 ) -> None:
@@ -71,6 +72,7 @@ def _run_audit_background(
             provider=provider,
             db=db,
             dormant_threshold_days=dormant_threshold_days,
+            audit_id=audit_id,
         )
         db.commit()
         logger.info("Background audit %s completed successfully.", dataset_id)
@@ -143,6 +145,7 @@ async def create_audit(
     background_tasks.add_task(
         _run_audit_background,
         dataset_id=payload.dataset_id,
+        audit_id=audit.id,
         dormant_threshold_days=dormant_threshold_days,
         correlation_id=correlation_id,
     )

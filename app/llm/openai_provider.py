@@ -154,6 +154,7 @@ class OpenAIProvider(BaseLLMProvider):
             model=model,
             temperature=temperature,
             api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url or None,
             max_retries=max_retries,
             timeout=60,
         )

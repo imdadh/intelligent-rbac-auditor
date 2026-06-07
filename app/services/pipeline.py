@@ -22,6 +22,7 @@ def run_audit(
     provider: BaseLLMProvider,
     db: Session,
     dormant_threshold_days: int = 30,
+    audit_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     """Execute the full audit pipeline for a given dataset.
 
@@ -66,21 +67,33 @@ def run_audit(
     )
 
     # ------------------------------------------------------------------
-    # 2. Create an Audit record with status 'running'
+    # 2. Use the pre-created Audit record (if supplied) or create one
     # ------------------------------------------------------------------
-    audit = Audit(
-        dataset_id=dataset_id,
-        status="running",
-        parameters={
+    if audit_id is not None:
+        audit: Audit | None = db.query(Audit).filter(Audit.id == audit_id).first()
+        if audit is None:
+            raise ValueError(f"Audit {audit_id} not found.")
+        audit.status = "running"
+        audit.started_at = datetime.now(UTC)
+        audit.parameters = {
             "dormant_threshold_days": dormant_threshold_days,
             "llm_provider": type(provider).__name__,
-        },
-        started_at=datetime.now(UTC),
-    )
-    db.add(audit)
-    db.flush()  # generate audit.id
+        }
+        db.flush()
+    else:
+        audit = Audit(
+            dataset_id=dataset_id,
+            status="running",
+            parameters={
+                "dormant_threshold_days": dormant_threshold_days,
+                "llm_provider": type(provider).__name__,
+            },
+            started_at=datetime.now(UTC),
+        )
+        db.add(audit)
+        db.flush()
 
-    audit_id: uuid.UUID = audit.id
+    audit_id = audit.id
 
     try:
         # ------------------------------------------------------------------
