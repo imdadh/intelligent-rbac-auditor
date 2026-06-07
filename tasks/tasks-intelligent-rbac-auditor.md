@@ -133,7 +133,7 @@
   - [x] 6.3 Create `app/static/script.js` implementing API calls: load sample data (calls POST datasets), trigger audit (POST audits), poll status, fetch report, send query.
   - [ ] 6.4 Configure FastAPI to serve static files at `/` and `/static/*` in `app/main.py`.
   - [x] 6.5 Add a "load sample data" button that calls the data generation endpoint (or uses pre-generated JSON).
-  - [ ] 6.6 Test UI flow manually: load data, run audit, verify findings appear with severity badges, ask a test query.
+  - [x] 6.6 Test UI flow manually: load data, run audit, verify findings appear with severity badges, ask a test query.
   - [ ] 6.7 Ensure web UI dispalys the Markdown narrative report (rendered as HTML) in a collapsible section.
 - [ ] 7.0 Add production-readiness features: rate-limiting, auth, health check, and correlation IDs
   - [ ] 7.1 Add `slowapi` rate limiter middleware to FastAPI app in `app/main.py`; limit to 60 requests/minute per client by default (configurable via `RATE_LIMIT_PER_MINUTE`).
