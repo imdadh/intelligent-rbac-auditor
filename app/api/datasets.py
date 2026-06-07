@@ -15,7 +15,7 @@ from app.services.ingestion import DatasetIngestionError, ingest_dataset
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
+router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 # ------------------------------------------------------------------
 # Path to the bundled sample dataset (relative to the project root)
