@@ -48,7 +48,7 @@ def mock_azure_llm() -> MagicMock:
     """Return a MagicMock that imitates a LangChain AzureChatOpenAI instance."""
     mock = MagicMock()
     response = MagicMock()
-    response.content = '{"findings": [{"id": "f2", "category": "dormant_privileged", "severity": "medium", "principal_id": "u2", "principal_name": "Bob", "role_assignments": [{"roleName": "User Administrator"}], "evidence": {"days_since_last_signin": 62}, "remediation": "Remove assignment", "narrative": "Bob's User Admin assignment is dormant."}]}'
+    response.content = '{"findings": [{"id": "f2", "category": "dormant_privileged", "severity": "medium", "principal_id": "u2", "principal_name": "Bob", "role_assignments": [{"roleName": "User Administrator"}], "evidence": {"days_since_last_signin": 62}, "remediation": "Remove assignment", "narrative": "Bob\'s User Admin assignment is dormant."}]}'
     mock.invoke.return_value = response
     return mock
 
@@ -118,9 +118,7 @@ class TestOpenAIProvider:
         assert provider is not None
         assert provider._model is not None
 
-    def test_analyze_findings_returns_expected_structure(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_returns_expected_structure(self, mock_openai_llm: MagicMock) -> None:
         """The provider returns a list of findings with the correct keys."""
         provider = self._make_provider(mock_openai_llm)
 
@@ -158,17 +156,13 @@ class TestOpenAIProvider:
         assert finding["principal_id"] == "u1"
         assert finding["category"] == "overprivileged"
 
-    def test_analyze_findings_handles_empty_input(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_handles_empty_input(self, mock_openai_llm: MagicMock) -> None:
         """Empty list of preprocessed data returns an empty list."""
         provider = self._make_provider(mock_openai_llm)
         findings = provider.analyze_findings([])
         assert findings == []
 
-    def test_answer_query_returns_structured_response(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_answer_query_returns_structured_response(self, mock_openai_llm: MagicMock) -> None:
         """The answer_query method returns a dict with 'structured' and 'summary' keys."""
         provider = self._make_provider(mock_openai_llm)
 
@@ -192,9 +186,7 @@ class TestOpenAIProvider:
         assert "summary" in result
         assert result["summary"] == "Found 1 user."
 
-    def test_answer_query_handles_unanswerable(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_answer_query_handles_unanswerable(self, mock_openai_llm: MagicMock) -> None:
         """When the LLM indicates it cannot answer, the provider returns
         a graceful error-like summary."""
         provider = self._make_provider(mock_openai_llm)
@@ -257,9 +249,7 @@ class TestAzureOpenAIProvider:
         assert provider is not None
         assert provider._model is not None
 
-    def test_analyze_findings_returns_expected_structure(
-        self, mock_azure_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_returns_expected_structure(self, mock_azure_llm: MagicMock) -> None:
         """Returns findings list with correct keys from mocked response."""
         provider = self._make_provider(mock_azure_llm)
 
@@ -285,25 +275,18 @@ class TestAzureOpenAIProvider:
         assert finding["principal_id"] == "u2"
         assert finding["narrative"].startswith("Bob")
 
-    def test_analyze_findings_handles_empty_input(
-        self, mock_azure_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_handles_empty_input(self, mock_azure_llm: MagicMock) -> None:
         """Empty list returns empty list."""
         provider = self._make_provider(mock_azure_llm)
         findings = provider.analyze_findings([])
         assert findings == []
 
-    def test_answer_query_returns_structured_response(
-        self, mock_azure_llm: MagicMock
-    ) -> None:
+    def test_answer_query_returns_structured_response(self, mock_azure_llm: MagicMock) -> None:
         """answer_query returns dict with structured and summary keys."""
         provider = self._make_provider(mock_azure_llm)
 
         answer_response = MagicMock()
-        answer_response.content = (
-            '{"structured": [], '
-            '"summary": "No results found."}'
-        )
+        answer_response.content = '{"structured": [], ' '"summary": "No results found."}'
         mock_azure_llm.invoke.return_value = answer_response
 
         result = provider.answer_query(
@@ -315,9 +298,7 @@ class TestAzureOpenAIProvider:
         assert "summary" in result
         assert result["summary"] == "No results found."
 
-    def test_answer_query_handles_unanswerable(
-        self, mock_azure_llm: MagicMock
-    ) -> None:
+    def test_answer_query_handles_unanswerable(self, mock_azure_llm: MagicMock) -> None:
         """Graceful handling when the LLM cannot answer."""
         provider = self._make_provider(mock_azure_llm)
 
@@ -366,9 +347,7 @@ class TestProviderErrorHandling:
         provider._model = mock_model
         return provider
 
-    def test_analyze_findings_raises_on_missing_content(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_raises_on_missing_content(self, mock_openai_llm: MagicMock) -> None:
         """If the LLM response does not contain parsable JSON, the provider
         raises a ValueError (or appropriate error).
         """
@@ -383,9 +362,7 @@ class TestProviderErrorHandling:
         with pytest.raises((ValueError, Exception)):
             provider.analyze_findings(preprocessed)
 
-    def test_analyze_findings_raises_on_llm_exception(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_analyze_findings_raises_on_llm_exception(self, mock_openai_llm: MagicMock) -> None:
         """If the LangChain call itself fails (e.g., network error), the
         provider should propagate the exception.
         """
@@ -396,9 +373,7 @@ class TestProviderErrorHandling:
         with pytest.raises(RuntimeError, match="API call failed"):
             provider.analyze_findings([{"user_id": "u1"}])
 
-    def test_answer_query_raises_on_llm_exception(
-        self, mock_openai_llm: MagicMock
-    ) -> None:
+    def test_answer_query_raises_on_llm_exception(self, mock_openai_llm: MagicMock) -> None:
         """LLM failure during query answering raises an exception."""
         provider = self._make_openai_provider(mock_openai_llm)
 
