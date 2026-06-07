@@ -112,27 +112,21 @@ class TestValidateDatasetData:
         with pytest.raises(DatasetIngestionError, match="users"):
             validate_dataset_data(data)
 
-    def test_missing_required_user_field_raises_error(
-        self, minimal_valid_payload: dict
-    ) -> None:
+    def test_missing_required_user_field_raises_error(self, minimal_valid_payload: dict) -> None:
         """A user entry missing ``identifier`` should fail."""
         payload = copy.deepcopy(minimal_valid_payload)
         del payload["users"][0]["id"]  # required field in UserRecord is 'id'
         with pytest.raises(DatasetIngestionError, match="id"):
             validate_dataset_data(payload)
 
-    def test_missing_required_role_field_raises_error(
-        self, minimal_valid_payload: dict
-    ) -> None:
+    def test_missing_required_role_field_raises_error(self, minimal_valid_payload: dict) -> None:
         """A role assignment missing ``roleName`` should fail."""
         payload = copy.deepcopy(minimal_valid_payload)
         del payload["roleAssignments"][0]["roleName"]
         with pytest.raises(DatasetIngestionError, match="roleName"):
             validate_dataset_data(payload)
 
-    def test_missing_required_role_id_raises_error(
-        self, minimal_valid_payload: dict
-    ) -> None:
+    def test_missing_required_role_id_raises_error(self, minimal_valid_payload: dict) -> None:
         """A role assignment missing ``roleDefinitionId`` should fail."""
         payload = copy.deepcopy(minimal_valid_payload)
         del payload["roleAssignments"][0]["roleDefinitionId"]
@@ -148,9 +142,7 @@ class TestValidateDatasetData:
         with pytest.raises(DatasetIngestionError, match="assignmentType"):
             validate_dataset_data(payload)
 
-    def test_invalid_assignment_type_raises_error(
-        self, minimal_valid_payload: dict
-    ) -> None:
+    def test_invalid_assignment_type_raises_error(self, minimal_valid_payload: dict) -> None:
         """An invalid ``assignmentType`` value should fail."""
         payload = copy.deepcopy(minimal_valid_payload)
         payload["roleAssignments"][0]["assignmentType"] = "invalid"
@@ -195,15 +187,11 @@ class TestValidateDatasetData:
 class TestCrossReferenceValidation:
     """Ensure cross-reference invariants are enforced."""
 
-    def test_role_assignment_principal_id_not_found(
-        self, minimal_valid_payload: dict
-    ) -> None:
+    def test_role_assignment_principal_id_not_found(self, minimal_valid_payload: dict) -> None:
         """A role assignment referencing a non-existent user must fail."""
         payload = copy.deepcopy(minimal_valid_payload)
         payload["roleAssignments"][0]["principalId"] = "nonexistent-user"
-        with pytest.raises(
-            DatasetIngestionError, match="does not reference any user or group"
-        ):
+        with pytest.raises(DatasetIngestionError, match="does not reference any user or group"):
             validate_dataset_data(payload)
 
     def test_signin_log_user_id_not_found(self, minimal_valid_payload: dict) -> None:

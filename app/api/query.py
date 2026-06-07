@@ -50,9 +50,7 @@ async def query_dataset(
     # ------------------------------------------------------------------
     # 1. Load the dataset
     # ------------------------------------------------------------------
-    dataset: Dataset | None = (
-        db.query(Dataset).filter(Dataset.id == payload.dataset_id).first()
-    )
+    dataset: Dataset | None = db.query(Dataset).filter(Dataset.id == payload.dataset_id).first()
     if dataset is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -174,9 +174,7 @@ class TestRateLimiting:
     def test_rate_limit_with_auth_enabled(self, client_with_auth_and_low_rate_limit):
         """Rate limiting should still be enforced when authentication is enabled."""
         client = client_with_auth_and_low_rate_limit
-        headers = {
-            "Authorization": "Bearer test-api-key-123"
-        }  # pragma: allowlist secret
+        headers = {"Authorization": "Bearer test-api-key-123"}  # pragma: allowlist secret
         # Two requests with valid auth
         resp1 = client.get("/api/v1/datasets/sample", headers=headers)
         assert resp1.status_code != 429  # Should succeed (maybe 404 etc.)
@@ -220,9 +218,7 @@ class TestAuthentication:
         """When AUTH_ENABLED is true, requests with the correct API key
         should succeed (returning non-401)."""
         # Use exact key without extra spaces or comments.
-        headers = {
-            "Authorization": "Bearer test-api-key-123"
-        }  # pragma: allowlist secret
+        headers = {"Authorization": "Bearer test-api-key-123"}  # pragma: allowlist secret
         resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
         # The endpoint might return 404 if no dataset exists (acceptable),
         # but it should NOT return 401.
@@ -265,9 +261,7 @@ class TestAuthentication:
     def test_auth_enabled_valid_key_on_post(self, client_with_auth_enabled):
         """POST endpoints should also require a valid API key when auth
         is enabled."""
-        headers = {
-            "Authorization": "Bearer test-api-key-123"
-        }  # pragma: allowlist secret
+        headers = {"Authorization": "Bearer test-api-key-123"}  # pragma: allowlist secret
         # POST to /api/v1/datasets/sample with valid key – should not be 401
         resp = client_with_auth_enabled.post("/api/v1/datasets/sample", headers=headers)
         assert resp.status_code != 401

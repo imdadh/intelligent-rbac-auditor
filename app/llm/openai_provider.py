@@ -25,16 +25,12 @@ logger = logging.getLogger(__name__)
 class LLMFindingOutput(BaseModel):
     """Single finding as returned by the LLM, prior to assigning audit IDs."""
 
-    category: str = Field(
-        description="Finding category: overprivileged or dormant_privileged"
-    )
+    category: str = Field(description="Finding category: overprivileged or dormant_privileged")
     severity: str = Field(description="Severity level: critical, high, medium, low")
     principal_id: str = Field(description="Object ID of the affected principal")
     principal_name: str = Field(description="Display name of the affected principal")
     principal_type: str = Field(description="Type: Member, Guest, or ServicePrincipal")
-    role_assignments: list[dict[str, Any]] = Field(
-        description="List of relevant role assignments"
-    )
+    role_assignments: list[dict[str, Any]] = Field(description="List of relevant role assignments")
     evidence: dict[str, Any] = Field(
         description="Supporting evidence, e.g. days_since_last_sign_in"
     )
@@ -54,12 +50,8 @@ class LLMQueryResponse(BaseModel):
     structured_data: list[dict[str, Any]] = Field(
         description="Array of matching records or computed values"
     )
-    natural_language_summary: str = Field(
-        description="Human-readable summary of the answer"
-    )
-    answerable: bool = Field(
-        default=True, description="Whether the question could be answered"
-    )
+    natural_language_summary: str = Field(description="Human-readable summary of the answer")
+    answerable: bool = Field(default=True, description="Whether the question could be answered")
 
 
 # ---------------------------------------------------------------------------

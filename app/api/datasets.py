@@ -109,9 +109,7 @@ def load_sample_dataset(
             "id": str(dataset.id),
             "name": dataset.name,
             "user_count": dataset.user_count,
-            "created_at": (
-                dataset.created_at.isoformat() if dataset.created_at else None
-            ),
+            "created_at": (dataset.created_at.isoformat() if dataset.created_at else None),
         },
         meta=Meta(),
     )
@@ -155,9 +153,7 @@ def create_dataset(
             "id": str(dataset.id),
             "name": dataset.name,
             "user_count": dataset.user_count,
-            "created_at": (
-                dataset.created_at.isoformat() if dataset.created_at else None
-            ),
+            "created_at": (dataset.created_at.isoformat() if dataset.created_at else None),
         },
         meta=Meta(total=dataset.user_count),
     )
@@ -187,9 +183,7 @@ def get_dataset(
             "id": str(dataset.id),
             "name": dataset.name,
             "user_count": dataset.user_count,
-            "created_at": (
-                dataset.created_at.isoformat() if dataset.created_at else None
-            ),
+            "created_at": (dataset.created_at.isoformat() if dataset.created_at else None),
         },
         meta=Meta(total=dataset.user_count),
     )

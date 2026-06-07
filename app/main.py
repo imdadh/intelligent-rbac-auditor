@@ -50,11 +50,7 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     async def health() -> dict:  # type: ignore[type-arg]
         db_ok = check_database_connectivity()
-        elapsed = (
-            (datetime.now(UTC) - _start_time).total_seconds()
-            if _start_time
-            else 0.0
-        )
+        elapsed = (datetime.now(UTC) - _start_time).total_seconds() if _start_time else 0.0
         return {
             "status": "ok",
             "database": "connected" if db_ok else "unavailable",

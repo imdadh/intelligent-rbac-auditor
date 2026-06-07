@@ -68,8 +68,7 @@ class Settings(BaseSettings):
     azure_openai_endpoint: str | None = Field(
         default=None,
         description=(
-            "Azure OpenAI resource endpoint URL "
-            "(e.g. https://<resource>.openai.azure.com/)."
+            "Azure OpenAI resource endpoint URL " "(e.g. https://<resource>.openai.azure.com/)."
         ),
     )
     azure_openai_deployment: str | None = Field(
@@ -133,9 +132,7 @@ class Settings(BaseSettings):
         normalised = value.upper()
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if normalised not in valid_levels:
-            raise ValueError(
-                f"log_level must be one of {sorted(valid_levels)}, got '{value}'."
-            )
+            raise ValueError(f"log_level must be one of {sorted(valid_levels)}, got '{value}'.")
         return normalised
 
     @field_validator("database_url")

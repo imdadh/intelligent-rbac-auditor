@@ -79,9 +79,7 @@ def _run_audit_background(
         db.rollback()
         # Update the audit status to 'failed' if the pipeline raised
         try:
-            audit: Audit | None = (
-                db.query(Audit).filter(Audit.dataset_id == dataset_id).first()
-            )
+            audit: Audit | None = db.query(Audit).filter(Audit.dataset_id == dataset_id).first()
             if audit is not None:
                 audit.status = "failed"
                 audit.completed_at = datetime.now(UTC)
@@ -113,9 +111,7 @@ async def create_audit(
 ) -> DataResponse:
     """Create an audit and schedule background processing."""
     # Validate that the dataset exists
-    dataset: Dataset | None = (
-        db.query(Dataset).filter(Dataset.id == payload.dataset_id).first()
-    )
+    dataset: Dataset | None = db.query(Dataset).filter(Dataset.id == payload.dataset_id).first()
     if dataset is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -204,8 +200,7 @@ def get_audit(
             .all()
         )
         findings_data = [
-            FindingSchema.model_validate(f).model_dump(mode="json")
-            for f in findings_orm
+            FindingSchema.model_validate(f).model_dump(mode="json") for f in findings_orm
         ]
 
     data = {
@@ -241,9 +236,7 @@ def get_audit(
 )
 def get_audit_report(
     audit_id: uuid.UUID,
-    format: str = Query(
-        "markdown", description="Report format (only 'markdown' supported)"
-    ),
+    format: str = Query("markdown", description="Report format (only 'markdown' supported)"),
     db: Session = Depends(get_db),
 ) -> PlainTextResponse:
     """Generate a Markdown narrative report from the audit findings."""
@@ -372,15 +365,11 @@ def _generate_markdown_report(audit: Audit, findings: list[Finding]) -> str:
         if not sev_findings:
             continue
         emoji = severity_emoji.get(sev, "")
-        lines.append(
-            f"## {emoji} {sev.capitalize()} Severity Findings ({len(sev_findings)})"
-        )
+        lines.append(f"## {emoji} {sev.capitalize()} Severity Findings ({len(sev_findings)})")
         lines.append("")
 
         for idx, finding in enumerate(sev_findings, start=1):
-            lines.append(
-                f"### {idx}. {finding.principal_name} (`{finding.principal_id}`)"
-            )
+            lines.append(f"### {idx}. {finding.principal_name} (`{finding.principal_id}`)")
             lines.append("")
             lines.append(f"- **Category:** {finding.category}")
             lines.append(f"- **Principal type:** {finding.principal_type}")

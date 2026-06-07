@@ -162,9 +162,7 @@ class TestUIFlow:
             status = response.json()["data"]["status"]
             retries += 1
 
-        assert (
-            status == "completed"
-        ), f"Audit did not complete within time. Last status: {status}"
+        assert status == "completed", f"Audit did not complete within time. Last status: {status}"
 
         # ------------------------------------------------------------------
         # Step 4: Verify findings appear with severity badges
@@ -174,9 +172,7 @@ class TestUIFlow:
         assert len(findings) >= 2, f"Expected at least 2 findings, got {len(findings)}"
 
         for finding in findings:
-            assert (
-                "severity" in finding
-            ), f"Finding missing severity badge: {finding['id']}"
+            assert "severity" in finding, f"Finding missing severity badge: {finding['id']}"
             assert finding["severity"] in (
                 "critical",
                 "high",

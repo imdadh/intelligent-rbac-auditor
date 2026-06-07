@@ -100,8 +100,7 @@ def _validate_cross_references(payload: AzureADDatasetPayload) -> None:
         if ra.assignmentType == "group":
             if ra.assignedVia is None:
                 raise DatasetIngestionError(
-                    f"roleAssignments[{i}] has assignmentType='group' but "
-                    "assignedVia is null."
+                    f"roleAssignments[{i}] has assignmentType='group' but " "assignedVia is null."
                 )
             if ra.assignedVia not in group_display_names:
                 logger.warning(

@@ -324,16 +324,12 @@ class TestFindingModel:
     def test_column_principal_type(self) -> None:
         col = Finding.__table__.columns["principal_type"]
         _assert_column_type(col, String)
-        _assert_column_attributes(
-            Finding, "principal_type", nullable=False, default="User"
-        )
+        _assert_column_attributes(Finding, "principal_type", nullable=False, default="User")
 
     def test_column_role_assignments(self) -> None:
         col = Finding.__table__.columns["role_assignments"]
         _assert_column_type(col, JSONB)
-        _assert_column_attributes(
-            Finding, "role_assignments", nullable=False, default=[]
-        )
+        _assert_column_attributes(Finding, "role_assignments", nullable=False, default=[])
 
     def test_column_evidence(self) -> None:
         col = Finding.__table__.columns["evidence"]

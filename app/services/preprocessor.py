@@ -133,9 +133,7 @@ def preprocess_dataset(dataset: dict[str, Any]) -> dict[str, dict[str, Any]]:
     snapshot_date_str = meta.get("snapshotDate")
     if snapshot_date_str:
         try:
-            snapshot_date = datetime.fromisoformat(
-                snapshot_date_str.replace("Z", "+00:00")
-            )
+            snapshot_date = datetime.fromisoformat(snapshot_date_str.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
             logger.warning(
                 "Unable to parse _meta.snapshotDate '%s'; using current UTC time.",
@@ -200,9 +198,7 @@ def preprocess_dataset(dataset: dict[str, Any]) -> dict[str, dict[str, Any]]:
         # --- Role information ---
         user_roles = user_role_map.get(user_id, [])
         role_names: list[str] = [ra.get("roleName", "Unknown") for ra in user_roles]
-        assignment_types: set[str] = {
-            ra.get("assignmentType", "direct") for ra in user_roles
-        }
+        assignment_types: set[str] = {ra.get("assignmentType", "direct") for ra in user_roles}
 
         if not assignment_types:
             assignment_type: str = "none"
@@ -228,9 +224,7 @@ def preprocess_dataset(dataset: dict[str, Any]) -> dict[str, dict[str, Any]]:
         last_signin = user_latest_signin.get(user_id)
         if last_signin is not None:
             delta: timedelta = snapshot_date - last_signin
-            days_since_last_sign_in: float | None = max(
-                0.0, delta.total_seconds() / 86400.0
-            )
+            days_since_last_sign_in: float | None = max(0.0, delta.total_seconds() / 86400.0)
         else:
             days_since_last_sign_in = None
 

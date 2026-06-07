@@ -108,12 +108,8 @@ class UserRecord(BaseModel):
     """
 
     id: str = Field(description="Azure AD object ID (UUID format) of the principal.")
-    displayName: str = Field(
-        description="Human-readable display name of the principal."
-    )
-    userPrincipalName: str = Field(
-        description="User principal name or application identifier URI."
-    )
+    displayName: str = Field(description="Human-readable display name of the principal.")
+    userPrincipalName: str = Field(description="User principal name or application identifier URI.")
     userType: Literal["Member", "Guest", "ServicePrincipal"] = Field(
         description="Principal category: Member, Guest, or ServicePrincipal."
     )
@@ -161,12 +157,8 @@ class RoleAssignmentRecord(BaseModel):
     """
 
     id: str = Field(description="Unique identifier for this role assignment record.")
-    principalId: str = Field(
-        description="Object ID of the principal that holds the role."
-    )
-    roleDefinitionId: str = Field(
-        description="Immutable Azure AD role definition UUID."
-    )
+    principalId: str = Field(description="Object ID of the principal that holds the role.")
+    roleDefinitionId: str = Field(description="Immutable Azure AD role definition UUID.")
     roleName: str = Field(description="Human-readable role display name.")
     assignmentType: Literal["direct", "group"] = Field(
         description="How the role is held: direct assignment or group inheritance."
@@ -178,9 +170,7 @@ class RoleAssignmentRecord(BaseModel):
             "Null for direct assignments."
         ),
     )
-    assignedAt: str = Field(
-        description="ISO 8601 UTC timestamp when the assignment was created."
-    )
+    assignedAt: str = Field(description="ISO 8601 UTC timestamp when the assignment was created.")
 
 
 # ---------------------------------------------------------------------------
@@ -220,18 +210,12 @@ class SignInLogRecord(BaseModel):
 
     id: str = Field(description="Unique identifier for this sign-in log entry.")
     userId: str = Field(description="Object ID of the user who signed in.")
-    userDisplayName: str = Field(
-        description="Display name of the user at the time of sign-in."
-    )
-    signInTimestamp: str = Field(
-        description="ISO 8601 UTC timestamp of the sign-in event."
-    )
+    userDisplayName: str = Field(description="Display name of the user at the time of sign-in.")
+    signInTimestamp: str = Field(description="ISO 8601 UTC timestamp of the sign-in event.")
     appDisplayName: str = Field(
         description="Display name of the application accessed during sign-in."
     )
-    status: Literal["Success", "Failure"] = Field(
-        description="Outcome of the sign-in attempt."
-    )
+    status: Literal["Success", "Failure"] = Field(description="Outcome of the sign-in attempt.")
     ipAddress: str = Field(description="Source IP address of the sign-in request.")
 
 
@@ -377,9 +361,7 @@ class AzureADDatasetPayload(BaseModel):
         }
     """
 
-    users: list[UserRecord] = Field(
-        description="All principals in scope for this snapshot."
-    )
+    users: list[UserRecord] = Field(description="All principals in scope for this snapshot.")
     roleAssignments: list[RoleAssignmentRecord] = Field(
         description="All active directory role assignments at snapshot time."
     )

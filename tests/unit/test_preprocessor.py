@@ -73,9 +73,7 @@ def simple_dataset() -> dict:
     return {
         "users": [_make_user("u1", "Alice")],
         "roleAssignments": [
-            _make_role_assignment(
-                "u1", "Global Administrator", assigned_at="2024-01-15T08:00:00Z"
-            )
+            _make_role_assignment("u1", "Global Administrator", assigned_at="2024-01-15T08:00:00Z")
         ],
         "signInLogs": [_make_signin_log("u1", "2024-10-01T10:00:00Z")],
         "groups": [],
@@ -320,9 +318,7 @@ class TestPreprocessDataset:
     def test_dataset_missing_fields_raises_error(self) -> None:
         """Incomplete dataset should raise a ValueError."""
         with pytest.raises((ValueError, KeyError)):
-            preprocess_dataset(
-                {"users": [], "roleAssignments": []}
-            )  # missing signInLogs
+            preprocess_dataset({"users": [], "roleAssignments": []})  # missing signInLogs
 
     def test_empty_users_returns_empty_list(self) -> None:
         """A dataset with no users should return an empty list."""
@@ -338,9 +334,7 @@ class TestPreprocessDataset:
     def test_many_users_performance(self) -> None:
         """Process a larger dataset without errors (smoke test)."""
         users = [_make_user(f"u{i}", f"User{i}") for i in range(100)]
-        assignments = [
-            _make_role_assignment(f"u{i}", "Security Reader") for i in range(50)
-        ]
+        assignments = [_make_role_assignment(f"u{i}", "Security Reader") for i in range(50)]
         logs = [_make_signin_log(f"u{i}", "2024-10-01T10:00:00Z") for i in range(80)]
         dataset = {
             "users": users,

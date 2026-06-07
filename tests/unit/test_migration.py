@@ -79,9 +79,7 @@ class TestCallableInterface:
     def test_downgrade_is_callable(self, migration: types.ModuleType) -> None:
         assert callable(getattr(migration, "downgrade", None))
 
-    def test_upgrade_takes_no_required_arguments(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_upgrade_takes_no_required_arguments(self, migration: types.ModuleType) -> None:
         sig = inspect.signature(migration.upgrade)
         required = [
             p
@@ -95,9 +93,7 @@ class TestCallableInterface:
         ]
         assert len(required) == 0
 
-    def test_downgrade_takes_no_required_arguments(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_downgrade_takes_no_required_arguments(self, migration: types.ModuleType) -> None:
         sig = inspect.signature(migration.downgrade)
         required = [
             p
@@ -174,21 +170,15 @@ class TestEnumValueCoverage:
         return inspect.getsource(migration.upgrade)
 
     @pytest.mark.parametrize("value", sorted(AUDIT_STATUS_VALUES))
-    def test_audit_status_value_present(
-        self, migration: types.ModuleType, value: str
-    ) -> None:
+    def test_audit_status_value_present(self, migration: types.ModuleType, value: str) -> None:
         assert value in self._upgrade_source(migration)
 
     @pytest.mark.parametrize("value", sorted(FINDING_CATEGORY_VALUES))
-    def test_finding_category_value_present(
-        self, migration: types.ModuleType, value: str
-    ) -> None:
+    def test_finding_category_value_present(self, migration: types.ModuleType, value: str) -> None:
         assert value in self._upgrade_source(migration)
 
     @pytest.mark.parametrize("value", sorted(FINDING_SEVERITY_VALUES))
-    def test_finding_severity_value_present(
-        self, migration: types.ModuleType, value: str
-    ) -> None:
+    def test_finding_severity_value_present(self, migration: types.ModuleType, value: str) -> None:
         assert value in self._upgrade_source(migration)
 
 
@@ -213,9 +203,7 @@ class TestIndexCoverage:
         return inspect.getsource(migration.upgrade)
 
     @pytest.mark.parametrize("index_name", sorted(EXPECTED_INDEXES))
-    def test_index_present_in_upgrade(
-        self, migration: types.ModuleType, index_name: str
-    ) -> None:
+    def test_index_present_in_upgrade(self, migration: types.ModuleType, index_name: str) -> None:
         source = self._upgrade_source(migration)
         assert (
             index_name in source
@@ -239,20 +227,14 @@ class TestEnumHelperObjects:
     def test_finding_severity_enum_name(self, migration: types.ModuleType) -> None:
         assert migration.finding_severity_enum.name == "finding_severity"
 
-    def test_audit_status_enum_create_type_false(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_audit_status_enum_create_type_false(self, migration: types.ModuleType) -> None:
         """create_type=False is required; the type is created manually via raw SQL."""
         assert migration.audit_status_enum.create_type is False
 
-    def test_finding_category_enum_create_type_false(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_finding_category_enum_create_type_false(self, migration: types.ModuleType) -> None:
         assert migration.finding_category_enum.create_type is False
 
-    def test_finding_severity_enum_create_type_false(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_finding_severity_enum_create_type_false(self, migration: types.ModuleType) -> None:
         assert migration.finding_severity_enum.create_type is False
 
 
@@ -298,24 +280,18 @@ class TestColumnSpotChecks:
             "natural_language_response",
         ],
     )
-    def test_column_present_in_upgrade(
-        self, migration: types.ModuleType, column_name: str
-    ) -> None:
+    def test_column_present_in_upgrade(self, migration: types.ModuleType, column_name: str) -> None:
         source = self._upgrade_source(migration)
         assert (
             column_name in source
         ), f"Expected column '{column_name}' to appear in upgrade() but it was not found."
 
-    def test_cascade_delete_present_for_audits_fk(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_cascade_delete_present_for_audits_fk(self, migration: types.ModuleType) -> None:
         """Foreign keys with ON DELETE CASCADE must be explicit in the migration."""
         source = self._upgrade_source(migration)
         assert "CASCADE" in source
 
-    def test_gen_random_uuid_used_as_server_default(
-        self, migration: types.ModuleType
-    ) -> None:
+    def test_gen_random_uuid_used_as_server_default(self, migration: types.ModuleType) -> None:
         """UUID primary keys should have gen_random_uuid() as the server-side default."""
         source = self._upgrade_source(migration)
         assert "gen_random_uuid()" in source

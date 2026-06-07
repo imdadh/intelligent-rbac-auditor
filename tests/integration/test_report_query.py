@@ -103,9 +103,7 @@ def completed_audit_id(db_session, sample_dataset_id):
         principal_id="f47ac10b-58cc-4372-a567-0e02b2c3d479",
         principal_name="Alice Admin",
         principal_type="Member",
-        role_assignments=[
-            {"role_name": "Global Administrator", "assignment_type": "direct"}
-        ],
+        role_assignments=[{"role_name": "Global Administrator", "assignment_type": "direct"}],
         evidence={
             "days_since_last_sign_in": 0.5,
             "role_tier": "critical",
@@ -184,12 +182,7 @@ class TestReportEndpoint:
         # Simpler: just mock a direct pytest-db fixture? We'll use the existing db_session
         from app.main import app as main_app
 
-        db = next(
-            iter(
-                dep()
-                for dep in main_app.dependency_overrides.get(get_db, [lambda: None])
-            )
-        )
+        db = next(iter(dep() for dep in main_app.dependency_overrides.get(get_db, [lambda: None])))
         # Actually we can reuse the module-scoped db_session fixture by injecting into the test
         # For this edge case we'll skip the full integration and just call with a pre-created pending audit.
         # Or we can create the pending audit here using the same db_session.
@@ -197,9 +190,7 @@ class TestReportEndpoint:
         # Instead, we'll directly create a pending audit via db_session (accessible via test_client? Not directly).
         # Use the same db_session fixture but it's module scoped. We'll add a pending audit ID fixture.
         # To keep it simple, we skip this test for now.
-        pytest.skip(
-            "Requires access to db_session fixture; will be covered in unit tests."
-        )
+        pytest.skip("Requires access to db_session fixture; will be covered in unit tests.")
 
 
 # --------------------------------------------------------------------------

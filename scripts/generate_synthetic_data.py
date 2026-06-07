@@ -378,9 +378,7 @@ def _build_ground_truth_accounts(
         (15, "Microsoft Teams"),
         (20, "Microsoft Office"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", marcus_id, "Marcus Webb", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", marcus_id, "Marcus Webb", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -414,9 +412,7 @@ def _build_ground_truth_accounts(
         (11, "Microsoft Teams"),
         (16, "Microsoft Office"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", diana_id, "Diana Okafor", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", diana_id, "Diana Okafor", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -456,9 +452,7 @@ def _build_ground_truth_accounts(
         (9, "Microsoft Teams"),
         (14, "Office 365 Exchange Online"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", ryan_id, "Ryan Kowalski", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", ryan_id, "Ryan Kowalski", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -530,9 +524,7 @@ def _build_ground_truth_accounts(
         (72, "Microsoft Teams"),
         (80, "Microsoft Azure Management"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", trevor_id, "Trevor Blanchard", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", trevor_id, "Trevor Blanchard", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -563,9 +555,7 @@ def _build_ground_truth_accounts(
         (61, "Microsoft Azure Management"),
         (68, "Azure Active Directory PowerShell"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", priya_id, "Priya Subramaniam", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", priya_id, "Priya Subramaniam", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -627,9 +617,7 @@ def _build_ground_truth_accounts(
         (45, "Microsoft Azure Management"),
         (52, "Office 365 Exchange Online"),
     ]:
-        sign_in_logs.append(
-            _make_sign_in(f"sl-{sc:06d}", chen_id, "Chen Wei", day, app)
-        )
+        sign_in_logs.append(_make_sign_in(f"sl-{sc:06d}", chen_id, "Chen Wei", day, app))
         sc += 1
 
     # -----------------------------------------------------------------------
@@ -658,9 +646,7 @@ def _build_ground_truth_accounts(
         )
     )
     rc += 1
-    logs, sc = _workday_sign_ins(
-        alice_id, "Alice Johnson", sc, (1, 30), ADMIN_APPS, count=10
-    )
+    logs, sc = _workday_sign_ins(alice_id, "Alice Johnson", sc, (1, 30), ADMIN_APPS, count=10)
     sign_in_logs.extend(logs)
 
     # -----------------------------------------------------------------------
@@ -686,9 +672,7 @@ def _build_ground_truth_accounts(
         )
     )
     rc += 1
-    logs, sc = _workday_sign_ins(
-        bob_id, "Bob Martinez", sc, (1, 20), NON_ADMIN_APPS, count=8
-    )
+    logs, sc = _workday_sign_ins(bob_id, "Bob Martinez", sc, (1, 20), NON_ADMIN_APPS, count=8)
     sign_in_logs.extend(logs)
 
     # -----------------------------------------------------------------------
@@ -941,7 +925,9 @@ def _build_bulk_users(
             upn = f"{display_name}@contoso.onmicrosoft.com"
         elif i % 15 == 0:
             user_type = "Guest"
-            upn = f"{first.lower()}.{last.lower()}_external@partner.com#EXT#@contoso.onmicrosoft.com"
+            upn = (
+                f"{first.lower()}.{last.lower()}_external@partner.com#EXT#@contoso.onmicrosoft.com"
+            )
         else:
             user_type = "Member"
 
@@ -974,9 +960,7 @@ def _build_bulk_users(
 
         # Random sign-in distribution across the 90-day window.
         sign_in_count = random.randint(3, 20)
-        app_pool = (
-            NON_ADMIN_APPS if user_type != "ServicePrincipal" else ["Microsoft Graph"]
-        )
+        app_pool = NON_ADMIN_APPS if user_type != "ServicePrincipal" else ["Microsoft Graph"]
         logs, sc = _workday_sign_ins(
             uid,
             display_name,
@@ -1137,9 +1121,7 @@ def generate_dataset(bulk_user_count: int = 88) -> dict:
         all_user_ids, gt_user_ids, ra_counter
     )
 
-    all_role_assignments = (
-        gt_role_assignments + bulk_role_assignments + group_role_assignments
-    )
+    all_role_assignments = gt_role_assignments + bulk_role_assignments + group_role_assignments
     all_sign_ins = gt_sign_ins + bulk_sign_ins
 
     return {

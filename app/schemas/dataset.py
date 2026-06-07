@@ -54,13 +54,9 @@ class DatasetCreate(BaseModel):
                 if f not in user
             ]
             if missing:
-                raise ValueError(
-                    f"User at index {i} is missing required fields: {missing}"
-                )
+                raise ValueError(f"User at index {i} is missing required fields: {missing}")
             for j, ra in enumerate(user.get("roleAssignments", [])):
-                ra_missing = [
-                    f for f in ("roleId", "roleName", "assignmentType") if f not in ra
-                ]
+                ra_missing = [f for f in ("roleId", "roleName", "assignmentType") if f not in ra]
                 if ra_missing:
                     raise ValueError(
                         f"roleAssignment at users[{i}].roleAssignments[{j}] "

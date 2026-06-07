@@ -341,7 +341,6 @@ class TestFullPipelineIntegration:
         resp = client.post("/api/v1/audits", json={"dataset_id": dataset_id})
         audit_id = resp.json()["data"]["id"]
 
-
         # Poll until completed or timeout
         for _ in range(30):
             poll = client.get(f"/api/v1/audits/{audit_id}")

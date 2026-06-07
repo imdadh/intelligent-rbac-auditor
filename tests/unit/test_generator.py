@@ -29,9 +29,7 @@ def seeded_dataset_bis() -> dict:
 class TestDeterministicOutput:
     """The generator must produce identical output for the same seed."""
 
-    def test_same_seed_identical(
-        self, seeded_dataset: dict, seeded_dataset_bis: dict
-    ) -> None:
+    def test_same_seed_identical(self, seeded_dataset: dict, seeded_dataset_bis: dict) -> None:
         assert seeded_dataset == seeded_dataset_bis
 
     def test_different_seed_different(self) -> None:
@@ -90,9 +88,7 @@ class TestCounts:
     def test_sign_in_log_count(self, seeded_dataset: dict) -> None:
         logs = seeded_dataset["signInLogs"]
         assert len(logs) >= 500, f"Expected at least 500 sign-in logs, got {len(logs)}"
-        assert (
-            len(logs) <= 5000
-        ), f"Expected no more than 5000 sign-in logs, got {len(logs)}"
+        assert len(logs) <= 5000, f"Expected no more than 5000 sign-in logs, got {len(logs)}"
 
     def test_group_count(self, seeded_dataset: dict) -> None:
         groups = seeded_dataset["groups"]
@@ -128,9 +124,7 @@ class TestUserFields:
     def test_user_type_valid(self, seeded_dataset: dict) -> None:
         valid_types = {"Member", "Guest", "ServicePrincipal"}
         for user in seeded_dataset["users"]:
-            assert (
-                user["userType"] in valid_types
-            ), f"Invalid userType: {user['userType']}"
+            assert user["userType"] in valid_types, f"Invalid userType: {user['userType']}"
 
 
 # ---------------------------------------------------------------------------
@@ -153,9 +147,7 @@ class TestRoleAssignmentFields:
     def test_all_assignments_have_required_fields(self, seeded_dataset: dict) -> None:
         for ra in seeded_dataset["roleAssignments"]:
             missing = self.REQUIRED_FIELDS - set(ra.keys())
-            assert (
-                not missing
-            ), f"Assignment {ra.get('id', '?')} missing fields: {missing}"
+            assert not missing, f"Assignment {ra.get('id', '?')} missing fields: {missing}"
 
     def test_assignment_type_valid(self, seeded_dataset: dict) -> None:
         valid_types = {"direct", "group"}
@@ -171,9 +163,7 @@ class TestRoleAssignmentFields:
             try:
                 datetime.datetime.fromisoformat(ra["assignedAt"])
             except (ValueError, TypeError):
-                pytest.fail(
-                    f"assignedAt '{ra['assignedAt']}' is not a valid ISO 8601 datetime"
-                )
+                pytest.fail(f"assignedAt '{ra['assignedAt']}' is not a valid ISO 8601 datetime")
 
 
 # ---------------------------------------------------------------------------
@@ -234,9 +224,7 @@ class TestGroupFields:
     def test_all_groups_have_required_fields(self, seeded_dataset: dict) -> None:
         for group in seeded_dataset["groups"]:
             missing = self.REQUIRED_FIELDS - set(group.keys())
-            assert (
-                not missing
-            ), f"Group {group.get('id', '?')} missing fields: {missing}"
+            assert not missing, f"Group {group.get('id', '?')} missing fields: {missing}"
 
     def test_members_is_list(self, seeded_dataset: dict) -> None:
         for group in seeded_dataset["groups"]:
@@ -300,10 +288,7 @@ class TestKnownAccounts:
         latest_signin: dict[str, str | None] = {}
         for log in seeded_dataset["signInLogs"]:
             uid = log["userId"]
-            if (
-                latest_signin.get(uid) is None
-                or log["signInTimestamp"] > latest_signin[uid]
-            ):
+            if latest_signin.get(uid) is None or log["signInTimestamp"] > latest_signin[uid]:
                 latest_signin[uid] = log["signInTimestamp"]
 
         # Reference date: now should be ~90 days after the seed's baseline
@@ -355,9 +340,7 @@ class TestKnownAccounts:
 class TestCrossReferenceIntegrity:
     """All referenced principal IDs must correspond to existing users or groups."""
 
-    def test_role_assignments_reference_existing_principals(
-        self, seeded_dataset: dict
-    ) -> None:
+    def test_role_assignments_reference_existing_principals(self, seeded_dataset: dict) -> None:
         user_ids = {u["id"] for u in seeded_dataset["users"]}
         group_ids = {g["id"] for g in seeded_dataset["groups"]}
         all_ids = user_ids | group_ids
