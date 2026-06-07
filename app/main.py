@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
-from slowapi.middleware import LimiterMiddleware
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.router import api_router
 from app.core.auth import AuthenticationMiddleware
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------
     app.state.limiter = limiter
     app.add_exception_handler(429, _rate_limit_exceeded_handler)
-    app.add_middleware(LimiterMiddleware, limiter=limiter)
+    app.add_middleware(SlowAPIMiddleware)
 
     logger.info("FastAPI application created (log_level=%s)", settings.log_level)
 
