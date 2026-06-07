@@ -61,6 +61,7 @@ services:
     environment:
       # Override DATABASE_URL so it always points at the compose db service
       # regardless of what the .env file contains locally.
+      PYTHONPATH: /app
       DATABASE_URL: postgresql://${POSTGRES_USER:-rbac_user}:${POSTGRES_PASSWORD:-rbac_password}@db:5432/${POSTGRES_DB:-rbac_auditor}
     volumes:
       # Mount the source tree for development convenience.  Remove this
