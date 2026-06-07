@@ -7,6 +7,7 @@ from typing import Any
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+import httpx
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
@@ -155,6 +156,8 @@ class OpenAIProvider(BaseLLMProvider):
             temperature=temperature,
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url or None,
+            http_client=httpx.Client(verify=False),
+            http_async_client=httpx.AsyncClient(verify=False),
             max_retries=max_retries,
             timeout=60,
         )
