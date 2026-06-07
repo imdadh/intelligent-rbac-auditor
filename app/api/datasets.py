@@ -34,7 +34,7 @@ def _get_sample_dataset_path() -> Path:
         # This file lives at app/api/datasets.py, so the project root is
         # (this file's parent) / .. / ..
         current_dir = Path(__file__).resolve().parent  # app/api
-        project_root = current_dir.parent.parent.parent  # project root
+        project_root = current_dir.parent.parent  # project root
         _SAMPLE_DATASET_PATH = project_root / "data" / "sample_dataset.json"
     return _SAMPLE_DATASET_PATH
 
