@@ -8,10 +8,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import LimiterMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.rate_limiter import limiter
 from app.models.base import check_database_connectivity
 
 logger = logging.getLogger(__name__)
@@ -49,7 +52,15 @@ def create_app() -> FastAPI:
         return FileResponse(static_path / "index.html")
 
     from app.core.middleware import CorrelationIDMiddleware
+
     app.add_middleware(CorrelationIDMiddleware)
+
+    # ------------------------------------------------------------------
+    # Rate limiting (slowapi)
+    # ------------------------------------------------------------------
+    app.state.limiter = limiter
+    app.add_exception_handler(429, _rate_limit_exceeded_handler)
+    app.add_middleware(LimiterMiddleware, limiter=limiter)
 
     logger.info("FastAPI application created (log_level=%s)", settings.log_level)
 
