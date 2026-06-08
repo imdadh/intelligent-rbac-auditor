@@ -126,7 +126,7 @@
 - [ ] 8.0 Write integration and unit tests, verify coverage, and finalize documentation
   - [x] 8.1 Write unit tests for `app/core/config.py` to verify environment variable loading and defaults.
   - [x] 8.2 Write unit tests for `app/models/` to verify model instantiation, relationships, and column types.
-  - [ ] 8.3 Write unit tests for `scripts/generate_data.py` to verify dataset structure and deterministic output.
+  - [x] 8.3 Write unit tests for `scripts/generate_data.py` to verify dataset structure and deterministic output.
   - [ ] 8.4 Write unit tests for `app/services/preprocessor.py` with known inputs and expected output.
   - [ ] 8.5 Write unit tests for `app/llm/base.py` and mocked implementations of `OpenAIProvider` and `AzureOpenAIProvider`.
   - [ ] 8.6 Write integration tests in `tests/integration/test_pipeline.py` that ingest the synthetic dataset, run the audit pipeline (with a mocked LLM), and assert that the known overprivileged and dormant accounts are flagged.
