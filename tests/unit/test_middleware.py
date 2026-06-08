@@ -74,6 +74,33 @@ def client_with_auth_enabled(mock_db_session) -> TestClient:
     app.dependency_overrides.pop(get_db, None)
 
 
+@pytest.fixture
+def client_with_auth_and_low_rate_limit(mock_db_session) -> TestClient:
+    """Return a TestClient with auth enabled, a known API key, and a low rate
+    limit so we can test both middleware components together."""
+
+    def override_get_db():
+        try:
+            yield mock_db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch.dict(
+        os.environ,
+        {
+            "AUTH_ENABLED": "true",
+            "API_KEY": "test-api-key-123",  # pragma: allowlist secret
+            "RATE_LIMIT_PER_MINUTE": "2",
+        },
+    ):
+        get_settings.cache_clear()
+        yield TestClient(app)
+
+    app.dependency_overrides.pop(get_db, None)
+
+
 # ---------------------------------------------------------------------------
 # Rate-Limiting Tests
 # ---------------------------------------------------------------------------
@@ -133,6 +160,32 @@ class TestRateLimiting:
         # The retry-after should be >0 and <=60
         assert 0 < retry_after <= 60
 
+    def test_rate_limit_on_public_paths(self, client_with_low_rate_limit):
+        """Rate limiting should apply to public paths like /health and /docs."""
+        client = client_with_low_rate_limit
+        # First request (health)
+        assert client.get("/health").status_code == 200
+        # Second request (docs)
+        assert client.get("/docs").status_code == 200
+        # Third request (redoc) - should be blocked
+        resp = client.get("/redoc")
+        assert resp.status_code == 429
+
+    def test_rate_limit_with_auth_enabled(self, client_with_auth_and_low_rate_limit):
+        """Rate limiting should still be enforced when authentication is enabled."""
+        client = client_with_auth_and_low_rate_limit
+        headers = {
+            "Authorization": "Bearer test-api-key-123"
+        }  # pragma: allowlist secret
+        # Two requests with valid auth
+        resp1 = client.get("/api/v1/datasets/sample", headers=headers)
+        assert resp1.status_code != 429  # Should succeed (maybe 404 etc.)
+        resp2 = client.get("/api/v1/datasets/sample", headers=headers)
+        assert resp2.status_code != 429
+        # Third request should be rate limited
+        resp3 = client.get("/api/v1/datasets/sample", headers=headers)
+        assert resp3.status_code == 429
+
 
 # ---------------------------------------------------------------------------
 # Authentication Middleware Tests
@@ -167,7 +220,9 @@ class TestAuthentication:
         """When AUTH_ENABLED is true, requests with the correct API key
         should succeed (returning non-401)."""
         # Use exact key without extra spaces or comments.
-        headers = {"Authorization": "Bearer test-api-key-123"}  # pragma: allowlist secret
+        headers = {
+            "Authorization": "Bearer test-api-key-123"
+        }  # pragma: allowlist secret
         resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
         # The endpoint might return 404 if no dataset exists (acceptable),
         # but it should NOT return 401.
@@ -184,6 +239,16 @@ class TestAuthentication:
         resp = client_with_auth_enabled.get("/docs")
         assert resp.status_code == 200
 
+    def test_auth_enabled_redoc_path_no_key(self, client_with_auth_enabled):
+        """The /redoc endpoint should be accessible without an API key."""
+        resp = client_with_auth_enabled.get("/redoc")
+        assert resp.status_code == 200
+
+    def test_auth_enabled_openapi_path_no_key(self, client_with_auth_enabled):
+        """The /openapi.json endpoint should be accessible without an API key."""
+        resp = client_with_auth_enabled.get("/openapi.json")
+        assert resp.status_code == 200
+
     def test_auth_enabled_malformed_header(self, client_with_auth_enabled):
         """A header without 'Bearer ' should be rejected."""
         headers = {"Authorization": "Basic some-token"}
@@ -196,3 +261,16 @@ class TestAuthentication:
         headers = {"Authorization": "Bearer "}
         resp = client_with_auth_enabled.get("/api/v1/datasets/sample", headers=headers)
         assert resp.status_code == 401
+
+    def test_auth_enabled_valid_key_on_post(self, client_with_auth_enabled):
+        """POST endpoints should also require a valid API key when auth
+        is enabled."""
+        headers = {
+            "Authorization": "Bearer test-api-key-123"
+        }  # pragma: allowlist secret
+        # POST to /api/v1/datasets/sample with valid key – should not be 401
+        resp = client_with_auth_enabled.post("/api/v1/datasets/sample", headers=headers)
+        assert resp.status_code != 401
+        # POST without valid key should be 401
+        resp_no_key = client_with_auth_enabled.post("/api/v1/datasets/sample")
+        assert resp_no_key.status_code == 401
