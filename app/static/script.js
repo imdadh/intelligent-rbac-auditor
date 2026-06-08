@@ -1,275 +1,292 @@
-// -----------------------------------------------------------------------
-// RBAC Policy Auditor — Single‑Page Application Logic
-// -----------------------------------------------------------------------
+// Intelligent RBAC Policy Auditor — Web UI interactivity
+// Vanilla JavaScript, no framework dependencies.
 
-// State
-let currentDatasetId = null;
-let currentAuditId = null;
+(function () {
+  'use strict';
 
-// DOM references (cached once on load)
-const loadSampleBtn = document.getElementById("load-sample-btn");
-const loadStatusEl = document.getElementById("load-status");
-const runAuditBtn = document.getElementById("run-audit-btn");
-const auditStatusEl = document.getElementById("audit-status");
-const findingsContainer = document.getElementById("findings-container");
-const reportDetails = document.getElementById("report-details");
-const reportContent = document.getElementById("report-content");
-const queryInput = document.getElementById("query-input");
-const queryBtn = document.getElementById("query-btn");
-const queryResponse = document.getElementById("query-response");
+  // ------------------------------------------------------------------
+  // State
+  // ------------------------------------------------------------------
+  let currentDatasetId = null;
+  let currentAuditId = null;
+  let pollingInterval = null;
 
-// -----------------------------------------------------------------------
-// Utility: build full API URL
-// -----------------------------------------------------------------------
-function apiUrl(path) {
-  return `/api/v1${path}`;
-}
+  // ------------------------------------------------------------------
+  // DOM references
+  // ------------------------------------------------------------------
+  const btnLoadSample = document.getElementById('btn-load-sample');
+  const btnRunAudit = document.getElementById('btn-run-audit');
+  const btnQuery = document.getElementById('btn-query');
+  const inputQuery = document.getElementById('query-input');
+  const loadStatus = document.getElementById('load-status');
+  const auditStatus = document.getElementById('audit-status');
+  const findingsContainer = document.getElementById('findings-container');
+  const reportDetails = document.getElementById('report-details');
+  const reportContent = document.getElementById('report-content');
+  const queryResponse = document.getElementById('query-response');
 
-// -----------------------------------------------------------------------
-// Utility: show status message
-// -----------------------------------------------------------------------
-function setStatus(el, message, type) {
-  el.textContent = message;
-  el.className = `status-message status-${type}`;
-}
+  // ------------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------------
 
-// -----------------------------------------------------------------------
-// 1. Load Sample Data
-// -----------------------------------------------------------------------
-loadSampleBtn.addEventListener("click", loadSampleData);
+  function setStatus(el, text, isError) {
+    el.textContent = text;
+    el.className = 'status-text' + (isError ? ' error' : ' success');
+  }
 
-async function loadSampleData() {
-  setStatus(loadStatusEl, "Loading sample dataset...", "info");
-  try {
-    const resp = await fetch(apiUrl("/datasets/sample"), {
-      method: "POST",
-      headers: { "Accept": "application/json" },
+  function enableButton(btn, enabled) {
+    btn.disabled = !enabled;
+  }
+
+  function showPlaceholder(container, text) {
+    container.innerHTML = '<p class="placeholder">' + escapeHtml(text) + '</p>';
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ------------------------------------------------------------------
+  // API base
+  // ------------------------------------------------------------------
+  const API_BASE = '/api/v1';
+
+  async function apiPost(endpoint, body) {
+    const res = await fetch(API_BASE + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      const detail = errData.detail || `HTTP ${resp.status}`;
-      throw new Error(detail);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error?.message || 'Request failed');
     }
-    const json = await resp.json();
-    currentDatasetId = json.data.id;
-    setStatus(
-      loadStatusEl,
-      `✅ Sample dataset loaded (ID: ${currentDatasetId}, users: ${json.data.user_count})`,
-      "success"
-    );
-    // Enable the audit button and clear previous audit/findings
-    runAuditBtn.disabled = false;
-    auditStatusEl.textContent = "";
-    findingsContainer.innerHTML =
-      '<p class="placeholder">Run an audit to see findings.</p>';
-    reportDetails.removeAttribute("open");
-    reportContent.innerHTML = "";
-    queryInput.disabled = true;
-    queryBtn.disabled = true;
-    queryResponse.textContent = "";
-  } catch (err) {
-    setStatus(loadStatusEl, `❌ Failed to load sample data: ${err.message}`, "error");
-  }
-}
-
-// -----------------------------------------------------------------------
-// 2. Run Audit
-// -----------------------------------------------------------------------
-runAuditBtn.addEventListener("click", runAudit);
-
-async function runAudit() {
-  if (!currentDatasetId) {
-    setStatus(auditStatusEl, "No dataset loaded. Please load sample data first.", "error");
-    return;
+    return res.json();
   }
 
-  setStatus(auditStatusEl, "Triggering audit...", "info");
-  runAuditBtn.disabled = true;
-
-  try {
-    const resp = await fetch(apiUrl("/audits"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ dataset_id: currentDatasetId }),
-    });
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.detail || `HTTP ${resp.status}`);
+  async function apiGet(endpoint) {
+    const res = await fetch(API_BASE + endpoint);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error?.message || 'Request failed');
     }
-    const json = await resp.json();
-    currentAuditId = json.data.id;
-    setStatus(auditStatusEl, `Audit started (ID: ${currentAuditId}). Polling for results...`, "info");
-
-    // Poll until completed or failed
-    await pollAuditStatus(currentAuditId);
-  } catch (err) {
-    setStatus(auditStatusEl, `❌ Audit failed: ${err.message}`, "error");
-    runAuditBtn.disabled = false;
+    return res.json();
   }
-}
 
-async function pollAuditStatus(auditId) {
-  const maxAttempts = 30;  // roughly 60 seconds
-  let attempts = 0;
+  // ------------------------------------------------------------------
+  // Step 1 — Load Sample Dataset
+  // ------------------------------------------------------------------
 
-  while (attempts < maxAttempts) {
-    await new Promise((r) => setTimeout(r, 2000));
-    attempts++;
-
+  btnLoadSample.addEventListener('click', async function () {
+    btnLoadSample.disabled = true;
+    setStatus(loadStatus, 'Loading...');
     try {
-      const resp = await fetch(apiUrl(`/audits/${auditId}`), {
-        headers: { "Accept": "application/json" },
-      });
-      if (!resp.ok) continue;
-      const json = await resp.json();
-      const status = json.data.status;
-
-      if (status === "completed") {
-        setStatus(auditStatusEl, `✅ Audit completed (${json.data.findings?.length || 0} findings).`, "success");
-        displayFindings(json.data);
-        fetchMarkdownReport(auditId);
-        runAuditBtn.disabled = false;
-        queryInput.disabled = false;
-        queryBtn.disabled = false;
-        queryResponse.textContent = "";
-        return;
-      } else if (status === "failed") {
-        throw new Error("Audit processing failed.");
+      const res = await fetch('/api/v1/datasets/sample', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to load sample dataset');
       }
-      // else "running" or "pending" — keep polling
-      setStatus(auditStatusEl, `Processing... (attempt ${attempts})`, "info");
+      const data = await res.json();
+      currentDatasetId = data.data.id;
+      setStatus(loadStatus, '✅ Dataset loaded (' + data.data.user_count + ' users)');
+      enableButton(btnRunAudit, true);
+      enableButton(inputQuery, false);
+      enableButton(btnQuery, false);
+      showPlaceholder(findingsContainer, 'Run an audit to see findings.');
     } catch (err) {
-      setStatus(auditStatusEl, `❌ Error polling audit: ${err.message}`, "error");
-      runAuditBtn.disabled = false;
-      return;
+      setStatus(loadStatus, '❌ ' + err.message, true);
+    } finally {
+      btnLoadSample.disabled = false;
     }
-  }
+  });
 
-  setStatus(auditStatusEl, "❌ Audit did not finish within the expected time.", "error");
-  runAuditBtn.disabled = false;
-}
+  // ------------------------------------------------------------------
+  // Step 2 — Run Audit
+  // ------------------------------------------------------------------
 
-// -----------------------------------------------------------------------
-// 3. Display Findings
-// -----------------------------------------------------------------------
-function displayFindings(auditData) {
-  const findings = auditData.findings || [];
-  if (findings.length === 0) {
-    findingsContainer.innerHTML = '<p class="placeholder">No findings — all accounts appear correctly provisioned.</p>';
-    return;
-  }
-
-  const severityOrder = ["critical", "high", "medium", "low"];
-  const severityEmoji = { critical: "🔴", high: "🟠", medium: "🟡", low: "⚪" };
-
-  let html = "<ul class='findings-list'>";
-  for (const sev of severityOrder) {
-    const items = findings.filter((f) => f.severity === sev);
-    if (items.length === 0) continue;
-    html += `<li><h3 class="severity-group severity-${sev}">${severityEmoji[sev]} ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${items.length})</h3><ul>`;
-    for (const f of items) {
-      html += `
-        <li class="finding-card">
-          <div class="finding-header">
-            <span class="severity-badge severity-${f.severity}">${f.severity}</span>
-            <strong>${f.principal_name}</strong> (${f.principal_id.slice(0, 8)}…)
-          </div>
-          <div class="finding-body">
-            <p><strong>Category:</strong> ${f.category}</p>
-            <p><strong>Roles:</strong> ${f.role_assignments.map(ra => ra.role_name).join(", ")}</p>
-            <p><strong>Evidence:</strong></p>
-            <ul>${Object.entries(f.evidence).map(([k, v]) => `<li>${k}: ${v}</li>`).join("")}</ul>
-            <p><strong>Remediation:</strong> ${f.remediation}</p>
-            <details>
-              <summary>📝 Narrative</summary>
-              <p>${f.narrative}</p>
-            </details>
-          </div>
-        </li>`;
-    }
-    html += "</ul></li>";
-  }
-  html += "</ul>";
-
-  findingsContainer.innerHTML = html;
-}
-
-// -----------------------------------------------------------------------
-// 3b. Fetch and render Markdown narrative report
-// -----------------------------------------------------------------------
-async function fetchMarkdownReport(auditId) {
-  try {
-    const resp = await fetch(`/api/v1/audits/${auditId}/report?format=markdown`);
-    if (!resp.ok) {
-      reportContent.innerHTML = `<p class="error">Failed to fetch report (HTTP ${resp.status})</p>`;
-      return;
-    }
-    const md = await resp.text();
-    // Simple markdown-to-HTML conversion for the most common patterns
-    const html = md
-      .replace(/^### (.+)$/gm, "<h4>$1</h4>")
-      .replace(/^## (.+)$/gm, "<h3>$1</h3>")
-      .replace(/^# (.+)$/gm, "<h2>$1</h2>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/^- (.+)$/gm, "<li>$1</li>")
-      .replace(/\n{2,}/g, "\n<br>\n");
-    reportContent.innerHTML = html;
-    reportDetails.setAttribute("open", "");
-  } catch (err) {
-    reportContent.innerHTML = `<p class="error">Error loading report: ${err.message}</p>`;
-  }
-}
-
-// -----------------------------------------------------------------------
-// 4. Query Interface
-// -----------------------------------------------------------------------
-queryBtn.addEventListener("click", askQuestion);
-queryInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") askQuestion();
-});
-
-async function askQuestion() {
-  const question = queryInput.value.trim();
-  if (!question) {
-    queryResponse.textContent = "Please enter a question.";
-    return;
-  }
-
-  queryResponse.textContent = "Thinking...";
-  queryBtn.disabled = true;
-
-  try {
-    const resp = await fetch(apiUrl("/query"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ dataset_id: currentDatasetId, question }),
-    });
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.detail || `HTTP ${resp.status}`);
-    }
-    const json = await resp.json();
-    const data = json.data;
-    let output = "";
-    if (data.answerable) {
-      output += `<p><strong>Answer:</strong> ${data.natural_language_summary}</p>`;
-      if (data.structured_data && data.structured_data.length > 0) {
-        output += "<pre>" + JSON.stringify(data.structured_data, null, 2) + "</pre>";
+  btnRunAudit.addEventListener('click', async function () {
+    if (!currentDatasetId) return;
+    btnRunAudit.disabled = true;
+    setStatus(auditStatus, 'Triggering audit...');
+    try {
+      const res = await fetch('/api/v1/audits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: currentDatasetId })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to trigger audit');
       }
-    } else {
-      output = `<p class="warning">⚠️ ${data.natural_language_summary}</p>`;
+      const data = await res.json();
+      currentAuditId = data.data.id;
+      setStatus(auditStatus, '⏳ Audit pending...');
+      // Poll for completion
+      pollAuditStatus(currentAuditId);
+    } catch (err) {
+      setStatus(auditStatus, '❌ ' + err.message, true);
+      btnRunAudit.disabled = false;
     }
-    queryResponse.innerHTML = output;
-  } catch (err) {
-    queryResponse.innerHTML = `<p class="error">❌ ${err.message}</p>`;
-  } finally {
-    queryBtn.disabled = false;
-  }
-}
+  });
 
-// -----------------------------------------------------------------------
-// Initial state: disable interactive sections
-// -----------------------------------------------------------------------
-runAuditBtn.disabled = true;
-queryInput.disabled = true;
-queryBtn.disabled = true;
+  function pollAuditStatus(auditId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(async function () {
+      try {
+        const data = await apiGet('/audits/' + auditId);
+        const audit = data.data;
+        switch (audit.status) {
+          case 'pending':
+          case 'running':
+            setStatus(auditStatus, '⏳ Audit ' + audit.status + '...');
+            break;
+          case 'completed':
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            setStatus(auditStatus, '✅ Audit completed (' + audit.summary?.total_findings + ' findings)');
+            renderFindings(audit.findings);
+            // Enable query interface
+            enableButton(inputQuery, true);
+            enableButton(btnQuery, true);
+            inputQuery.focus();
+            // Load the narrative report (content inside <details>)
+            loadReport(auditId);
+            break;
+          case 'failed':
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            setStatus(auditStatus, '❌ Audit failed', true);
+            enableButton(btnRunAudit, true);
+            break;
+        }
+      } catch (err) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+        setStatus(auditStatus, '❌ Polling error: ' + err.message, true);
+        enableButton(btnRunAudit, true);
+      }
+    }, 2000);
+  }
+
+  // ------------------------------------------------------------------
+  // Step 3 — Render Findings
+  // ------------------------------------------------------------------
+
+  function renderFindings(findings) {
+    if (!findings || findings.length === 0) {
+      findingsContainer.innerHTML = '<p class="placeholder">No findings — all accounts appear correctly provisioned.</p>';
+      return;
+    }
+
+    const severityColors = { critical: '#e53935', high: '#fb8c00', medium: '#fdd835', low: '#bdbdbd' };
+    const severityLabels = { critical: 'CRITICAL', high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
+
+    let html = '';
+    findings.forEach(function (f) {
+      const color = severityColors[f.severity] || '#bdbdbd';
+      const label = severityLabels[f.severity] || 'UNKNOWN';
+      html += '<div class="finding-card" style="border-left: 4px solid ' + color + ';">';
+      html += '<div class="finding-header">';
+      html += '<span class="severity-badge" style="background:' + color + ';">' + escapeHtml(label) + '</span>';
+      html += '<strong>' + escapeHtml(f.principal_name) + '</strong>';
+      html += '</div>';
+      html += '<div class="finding-details" style="display:none;">';
+      html += '<p><em>' + escapeHtml(f.category) + '</em> — ' + escapeHtml(f.remediation) + '</p>';
+      html += '<p>' + escapeHtml(f.narrative) + '</p>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    findingsContainer.innerHTML = html;
+
+    // Add click to expand details
+    var cards = findingsContainer.querySelectorAll('.finding-header');
+    cards.forEach(function (header) {
+      header.addEventListener('click', function () {
+        var details = this.nextElementSibling;
+        if (details && details.classList.contains('finding-details')) {
+          details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        }
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Load and Display Markdown Report (rendered as HTML)
+  // ------------------------------------------------------------------
+
+  async function loadReport(auditId) {
+    try {
+      const res = await fetch('/api/v1/audits/' + auditId + '/report?format=markdown');
+      if (!res.ok) {
+        reportContent.innerHTML = '<p class="placeholder">Failed to load report.</p>';
+        return;
+      }
+      const markdown = await res.text();
+      // Render using marked (included via CDN)
+      const html = marked.parse(markdown, { breaks: true, gfm: true });
+      reportContent.innerHTML = '<div class="report-html">' + html + '</div>';
+      // Automatically open the collapsible section
+      reportDetails.open = true;
+    } catch (err) {
+      reportContent.innerHTML = '<p class="placeholder">Error loading report: ' + escapeHtml(err.message) + '</p>';
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Step 4 — Query
+  // ------------------------------------------------------------------
+
+  btnQuery.addEventListener('click', async function () {
+    var question = inputQuery.value.trim();
+    if (!question || !currentDatasetId) return;
+    btnQuery.disabled = true;
+    queryResponse.innerHTML = '<p class="placeholder">Thinking...</p>';
+    try {
+      var res = await fetch('/api/v1/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: currentDatasetId, question: question })
+      });
+      if (!res.ok) {
+        var err = await res.json();
+        throw new Error(err.detail || 'Query failed');
+      }
+      var data = await res.json();
+      var ans = data.data;
+      if (ans.answerable) {
+        var html = '<div class="query-result">' +
+          '<p><strong>' + escapeHtml(ans.natural_language_summary) + '</strong></p>';
+        if (ans.structured_data && ans.structured_data.length > 0) {
+          html += '<pre>' + escapeHtml(JSON.stringify(ans.structured_data, null, 2)) + '</pre>';
+        }
+        html += '</div>';
+        queryResponse.innerHTML = html;
+      } else {
+        queryResponse.innerHTML = '<p class="placeholder">' + escapeHtml(ans.natural_language_summary) + '</p>';
+      }
+    } catch (err) {
+      queryResponse.innerHTML = '<p class="placeholder error">❌ ' + escapeHtml(err.message) + '</p>';
+    } finally {
+      btnQuery.disabled = false;
+    }
+  });
+
+  // Also allow Enter key in query input
+  inputQuery.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter' && !btnQuery.disabled) {
+      btnQuery.click();
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Initial state
+  // ------------------------------------------------------------------
+
+  enableButton(btnRunAudit, false);
+  enableButton(inputQuery, false);
+  enableButton(btnQuery, false);
+
+})();
