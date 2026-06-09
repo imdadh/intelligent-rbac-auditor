@@ -12,8 +12,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.middleware import LimiterMiddleware
 
 from app.api.router import api_router
+from app.core.auth import AuthenticationMiddleware
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.middleware import CorrelationIDMiddleware
 from app.core.rate_limiter import limiter
 from app.models.base import check_database_connectivity
 
@@ -51,9 +53,15 @@ def create_app() -> FastAPI:
     async def root() -> FileResponse:
         return FileResponse(static_path / "index.html")
 
-    from app.core.middleware import CorrelationIDMiddleware
-
+    # ------------------------------------------------------------------
+    # Middleware stack (order matters)
+    # ------------------------------------------------------------------
+    # 1. Correlation ID – runs first to capture / inject the trace header.
     app.add_middleware(CorrelationIDMiddleware)
+
+    # 2. Authentication – runs before rate limiting so that unauthenticated
+    #    requests are rejected before they consume a rate-limit bucket.
+    app.add_middleware(AuthenticationMiddleware)
 
     # ------------------------------------------------------------------
     # Rate limiting (slowapi)
