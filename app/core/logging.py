@@ -1,26 +1,3 @@
-"""Structured JSON logging configuration for the RBAC Policy Auditor.
-
-This module configures structlog to emit newline-delimited JSON records to
-stdout.  Every log record includes at minimum:
-
-    timestamp      — ISO-8601 UTC timestamp
-    level          — normalised log level string (info, warning, error, …)
-    logger         — name of the logger that emitted the record
-    correlation_id — UUID of the in-flight HTTP request (empty string when
-                     called outside a request context)
-
-Call ``configure_logging()`` once at application startup (i.e. in
-``app/main.py``) before the first request is processed.  Afterwards obtain
-a bound logger anywhere in the codebase with::
-
-    from app.core.logging import get_logger
-    logger = get_logger(__name__)
-    logger.info("dataset_ingested", dataset_id=str(dataset.id))
-
-Correlation IDs are propagated via a ``contextvars.ContextVar`` so that
-async handlers work correctly without any thread-local gotchas.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -91,6 +68,11 @@ def configure_logging(log_level: str = "INFO") -> None:
     tests) will simply overwrite the previous configuration without side
     effects.
 
+    All loggers — whether obtained via ``structlog.get_logger`` or the
+    standard ``logging.getLogger`` — will produce newline-delimited JSON
+    records to stdout.  Every record includes the current request's
+    correlation ID (empty string when no request context is active).
+
     Parameters
     ----------
     log_level:
@@ -99,21 +81,18 @@ def configure_logging(log_level: str = "INFO") -> None:
     """
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
 
-    # Configure the stdlib root logger so that third-party libraries that use
-    # the stdlib logging module (SQLAlchemy, uvicorn, etc.) are also captured
-    # and rendered through structlog's JSON formatter.
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=numeric_level,
-        force=True,
-    )
+    # ------------------------------------------------------------------
+    # Remove any existing handlers on the root logger to avoid duplicates
+    # when configure_logging is called more than once (e.g. in tests).
+    # ------------------------------------------------------------------
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
 
-    # Suppress overly chatty loggers that would otherwise flood the output
-    # in a development environment.
-    for noisy_logger in ("uvicorn.access",):
-        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
-
+    # ------------------------------------------------------------------
+    # Build the shared processor chain for both stdlib and structlog
+    # loggers.
+    # ------------------------------------------------------------------
     shared_processors: list[structlog.types.Processor] = [
         # Add log level as a string field before any other processing.
         structlog.stdlib.add_log_level,
@@ -134,15 +113,56 @@ def configure_logging(log_level: str = "INFO") -> None:
         _reorder_keys,
     ]
 
+    # ------------------------------------------------------------------
+    # Configure a logging handler that feeds stdlib log records through
+    # the structlog processor chain and outputs JSON.
+    # ------------------------------------------------------------------
+    handler = logging.StreamHandler(stream=sys.stdout)
+    handler.setLevel(numeric_level)
+    handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            processors=shared_processors
+            + [
+                # Render the final event dict as a JSON string.
+                structlog.processors.JSONRenderer(),
+            ],
+            foreign_pre_chain=[
+                # For log records that come from third-party libraries using
+                # plain stdlib formatting, extract the message and inject
+                # standard fields so the JSON output is consistent.
+                structlog.stdlib.ExtraAdder(),
+                _inject_correlation_id,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.add_logger_name,
+            ],
+        )
+    )
+
+    root_logger.addHandler(handler)
+    root_logger.setLevel(numeric_level)
+
+    # ------------------------------------------------------------------
+    # Suppress overly chatty loggers that would otherwise flood the output
+    # in a development environment.
+    # ------------------------------------------------------------------
+    for noisy_logger in ("uvicorn.access",):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
+    # ------------------------------------------------------------------
+    # Configure structlog itself so that structlog.get_logger returns a
+    # bound logger that delegates to the stdlib logging system.  This
+    # ensures that structlog loggers also go through the ProcessorFormatter
+    # configured above.
+    # ------------------------------------------------------------------
     structlog.configure(
-        processors=[
-            *shared_processors,
+        processors=shared_processors
+        + [
             # Render the final event dict as a JSON string.
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(numeric_level),
+        wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=False,
     )
 
