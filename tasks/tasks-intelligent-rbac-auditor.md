@@ -146,7 +146,7 @@
 - [ ] 7.0 Add production-readiness features: rate-limiting, auth, health check, and correlation IDs
   - [x] 7.1 Integrate `slowapi` rate‑limiter in `app/core/rate_limiter.py` and apply it to all API routes (configurable limit per minute)
   - [x] 7.2 Implement optional API key authentication middleware: check `Authorization: Bearer <key>` against `API_KEY` env var when `AUTH_ENABLED=true`
-  - [ ] 7.3 Add a `GET /health` endpoint that returns database connectivity status, service version, and uptime
+  - [x] 7.3 Add a `GET /health` endpoint that returns database connectivity status, service version, and uptime
   - [ ] 7.4 Add a middleware that generates or forwards a correlation ID (`X-Correlation-ID`) and includes it in all log entries
   - [ ] 7.5 Write unit tests for rate‑limiting and auth middleware (using test client)
   - [ ] 7.6 Update the logging configuration in `app/core/logging.py` to automatically attach the correlation ID
