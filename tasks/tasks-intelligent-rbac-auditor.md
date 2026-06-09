@@ -95,7 +95,7 @@
   - [ ] 4.2 Implement `OpenAIProvider` in `app/llm/openai_provider.py` using LangChain's `ChatOpenAI` with retry logic (exponential backoff, 3 attempts)
   - [x] 4.3 Implement `AzureOpenAIProvider` in `app/llm/azure_provider.py` using `AzureChatOpenAI` with configurable deployment, endpoint, and API key
   - [x] 4.4 Create prompt templates in `app/llm/prompts/` for overprivileged detection, dormant detection, and query answering, storing them as separate text files
-  - [ ] 4.5 Implement preprocessor in `app/services/preprocessor.py` that computes: days since last sign-in, role tier classification (critical/high/medium/low), assignment type (direct vs. group), and count of privileged roles per user
+  - [x] 4.5 Implement preprocessor in `app/services/preprocessor.py` that computes: days since last sign-in, role tier classification (critical/high/medium/low), assignment type (direct vs. group), and count of privileged roles per user
   - [ ] 4.6 Implement the pipeline orchestrator in `app/services/pipeline.py`: load dataset, run preprocessor, call LLM for each finding category, parse structured output, and store findings in the `findings` table
   - [ ] 4.7 Implement `POST /api/v1/audits` endpoint that accepts a `dataset_id`, creates an audit record with status `pending`, kicks off background processing (using FastAPI `BackgroundTasks`), and returns 202 with audit ID
   - [ ] 4.8 Implement `GET /api/v1/audits/{audit_id}` endpoint that returns audit status and (if completed) the full structured results from the `findings` table
