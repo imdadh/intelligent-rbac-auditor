@@ -5,11 +5,14 @@ running locally). The Settings object is instantiated once at module import
 time and re-used throughout the application via the `get_settings` helper.
 """
 
+from __future__ import annotations
+
 from functools import lru_cache
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine.url import make_url
 
 
 class Settings(BaseSettings):
@@ -135,20 +138,58 @@ class Settings(BaseSettings):
             )
         return normalised
 
+    @field_validator("database_url")
+    @classmethod
+    def _validate_database_url(cls, value: str) -> str:
+        """Ensure the database URL is a valid SQLAlchemy connection string.
+
+        This catches obvious typos early (e.g., missing scheme or password
+        with special characters) rather than failing at the first connection
+        attempt.
+        """
+        try:
+            parsed = make_url(value)
+            if not parsed.drivername.startswith("postgresql"):
+                raise ValueError(
+                    f"Database URL must use the 'postgresql' scheme, got '{parsed.drivername}'."
+                )
+        except Exception as exc:
+            raise ValueError(f"Invalid database_url '{value}': {exc}") from exc
+        return value
+
     @model_validator(mode="after")
-    def _validate_provider_credentials(self) -> "Settings":
+    def _validate_provider_credentials(self) -> Settings:
         """Enforce cross-field constraints after all individual fields are validated.
 
-        LLM credential validation is intentionally advisory — the service can start
-        (and serve the health endpoint) even when LLM credentials are temporarily
-        absent.  The LLM factory will raise a more specific error when a provider is
-        actually instantiated without credentials.
-
-        API key authentication is enforced strictly: if auth_enabled is True, an
-        api_key must be provided or the application will refuse to start.
+        Validates:
+        - LLM provider credentials are present when the corresponding provider is selected.
+        - API key is set when authentication is enabled.
         """
+        # ------------------------------------------------------------------
+        # LLM provider-specific credential requirements
+        # ------------------------------------------------------------------
+        if self.llm_provider == "openai" and not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY must be set when LLM_PROVIDER='openai'.")
+        if self.llm_provider == "azure_openai":
+            missing = []
+            if not self.azure_openai_api_key:
+                missing.append("AZURE_OPENAI_API_KEY")
+            if not self.azure_openai_endpoint:
+                missing.append("AZURE_OPENAI_ENDPOINT")
+            if not self.azure_openai_deployment:
+                missing.append("AZURE_OPENAI_DEPLOYMENT")
+            if missing:
+                raise ValueError(
+                    f"Missing required Azure OpenAI settings: {', '.join(missing)}. "
+                    "These must be set when LLM_PROVIDER='azure_openai'."
+                )
+
+        # ------------------------------------------------------------------
+        # Authentication key requirement
+        # ------------------------------------------------------------------
         if self.auth_enabled and not self.api_key:
-            raise ValueError("api_key must be set when auth_enabled=True.")
+            raise ValueError("API_KEY must be set when AUTH_ENABLED=True.")
+
         return self
 
 
