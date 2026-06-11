@@ -123,7 +123,7 @@
   - [ ] 7.3 Add correlation ID middleware in `app/main.py` that generates a UUID for each request and attaches it to logs via `structlog`.
   - [ ] 7.4 Expand the `/health` endpoint to verify database connectivity and return component status.
   - [ ] 7.5 Apply the rate-limiting middleware and auth dependency to all API routes (except `/health` and `/docs`).
-- [ ] 8.0 Write integration and unit tests, verify coverage, and finalize documentation
+- [x] 8.0 Write integration and unit tests, verify coverage, and finalize documentation
   - [x] 8.1 Write unit tests for `app/core/config.py` to verify environment variable loading and defaults.
   - [x] 8.2 Write unit tests for `app/models/` to verify model instantiation, relationships, and column types.
   - [x] 8.3 Write unit tests for `scripts/generate_data.py` to verify dataset structure and deterministic output.
@@ -133,4 +133,4 @@
   - [x] 8.7 Write integration tests for all API endpoints (`datasets`, `audits`, `query`, `health`) covering success and error cases.
   - [x] 8.8 Run `pytest --cov=app` to measure coverage; add missing tests to reach ≥80% line coverage on `app/` modules.
   - [x] 8.9 Write `README.md` with project overview, architecture diagram (ASCII or Mermaid), setup instructions (`docker-compose up`), API reference link (`/docs`), and sample usage.
-  - [ ] 8.10 Finalize all documentation: ensure `CONTRIBUTING.md` (if any), inline code comments, and this task list are complete.
+  - [x] 8.10 Finalize all documentation: ensure `CONTRIBUTING.md` (if any), inline code comments, and this task list are complete.
