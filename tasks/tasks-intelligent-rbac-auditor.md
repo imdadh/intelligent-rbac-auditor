@@ -132,5 +132,5 @@
   - [x] 8.6 Write integration tests in `tests/integration/test_pipeline.py` that ingest the synthetic dataset, run the audit pipeline (with a mocked LLM), and assert that the known overprivileged and dormant accounts are flagged.
   - [x] 8.7 Write integration tests for all API endpoints (`datasets`, `audits`, `query`, `health`) covering success and error cases.
   - [x] 8.8 Run `pytest --cov=app` to measure coverage; add missing tests to reach ≥80% line coverage on `app/` modules.
-  - [ ] 8.9 Write `README.md` with project overview, architecture diagram (ASCII or Mermaid), setup instructions (`docker-compose up`), API reference link (`/docs`), and sample usage.
+  - [x] 8.9 Write `README.md` with project overview, architecture diagram (ASCII or Mermaid), setup instructions (`docker-compose up`), API reference link (`/docs`), and sample usage.
   - [ ] 8.10 Finalize all documentation: ensure `CONTRIBUTING.md` (if any), inline code comments, and this task list are complete.
